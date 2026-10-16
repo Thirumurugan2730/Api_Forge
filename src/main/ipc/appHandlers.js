@@ -1,8 +1,10 @@
-const path = require('path');
+﻿const path = require('path');
 const fs = require('fs');
 const { clipboard } = require('electron');
 const { executeHttpRequest, cancelHttpRequest } = require('../http/httpClient');
 const collectionsStorage = require('../storage/collectionsStorage');
+const historyStorage = require('../storage/historyStorage');
+const settingsStorage = require('../storage/settingsStorage');
 
 /**
  * Validates any optional arguments supplied to the getAppInfo IPC channel.
@@ -113,6 +115,12 @@ function registerAppHandlers(ipcMain, appInstance) {
 
   // Ensure storage is initialized
   collectionsStorage.initStorage();
+  historyStorage.initHistoryStorage();
+  settingsStorage.initSettingsStorage();
+
+  // Sync history limit from persisted settings
+  const initialSettings = settingsStorage.getSettings();
+  historyStorage.setMaxEntries(initialSettings.historyLimit);
 
   // 1. App Info Channel
   ipcMain.handle('app:get-info', async (event, args) => {
@@ -219,6 +227,53 @@ function registerAppHandlers(ipcMain, appInstance) {
     const { collectionId, requestId } = payload || {};
     return collectionsStorage.duplicateRequest(collectionId, requestId);
   });
+
+
+
+  // =========================================================================
+  // History Storage Channels (Step 4)
+  // =========================================================================
+
+  ipcMain.handle('history:get', async () => {
+    return historyStorage.getHistory();
+  });
+
+  ipcMain.handle('history:add', async (event, payload) => {
+    if (!payload || typeof payload !== 'object') {
+      throw new TypeError('history:add payload must be an object');
+    }
+    return historyStorage.addHistoryEntry(payload);
+  });
+
+  ipcMain.handle('history:clear', async () => {
+    return historyStorage.clearHistory();
+  });
+
+  // =========================================================================
+  // Settings Storage Channels (Step 4)
+  // =========================================================================
+
+  ipcMain.handle('settings:get', async () => {
+    return settingsStorage.getSettings();
+  });
+
+  ipcMain.handle('settings:save', async (event, payload) => {
+    if (!payload || typeof payload !== 'object') {
+      throw new TypeError('settings:save payload must be an object');
+    }
+    // Validate in main process before persisting
+    settingsStorage.validateSettings(payload);
+    const saved = settingsStorage.saveSettings(payload);
+    // Sync historyStorage.maxEntries if historyLimit changed
+    if (typeof saved.historyLimit === 'number') {
+      historyStorage.setMaxEntries(saved.historyLimit);
+    }
+    return saved;
+  });
+
+  ipcMain.handle('settings:reset', async () => {
+    return settingsStorage.resetSettings();
+  });
 }
 
 module.exports = {
@@ -226,3 +281,4 @@ module.exports = {
   handleGetAppInfo,
   registerAppHandlers
 };
+

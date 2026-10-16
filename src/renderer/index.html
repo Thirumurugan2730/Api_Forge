@@ -1,10 +1,10 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'none'; font-src 'self';">
-  <title>ApiForge Lite — Spring Edition</title>
+  <title>ApiForge Lite â€” Spring Edition</title>
   <link rel="stylesheet" href="styles/main.css">
 </head>
 <body class="theme-dark">
@@ -55,18 +55,40 @@
         </div>
       </div>
 
-      <!-- Secondary Navigation -->
+
+      <!-- History Panel (Step 4) -->
+      <div id="history-panel" class="history-panel" aria-label="Request History">
+        <div class="history-panel-header">
+          <span class="nav-section-title">REQUEST HISTORY</span>
+          <button id="btn-clear-history" class="btn-icon-xs btn-danger-xs" title="Clear All History" aria-label="Clear History">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <polyline points="3 6 5 6 21 6"></polyline>
+              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"></path>
+            </svg>
+          </button>
+        </div>
+        <div id="history-list" class="history-list">
+          <div class="history-empty-state">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.3">
+              <circle cx="12" cy="12" r="10"></circle>
+              <polyline points="12 6 12 12 16 14"></polyline>
+            </svg>
+            <p>No history yet</p>
+            <span>Send a request to begin recording</span>
+          </div>
+        </div>
+      </div>      <!-- Secondary Navigation -->
       <nav class="sidebar-nav">
         <div class="nav-section-title">WORKSPACE</div>
         <ul class="nav-list">
           <li class="nav-item">
-            <button class="nav-btn" data-feature="History" data-step="Step 4" id="nav-history">
+            <button class="nav-btn nav-btn-active" id="nav-history" aria-pressed="false">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <circle cx="12" cy="12" r="10"></circle>
                 <polyline points="12 6 12 12 16 14"></polyline>
               </svg>
               <span>History</span>
-              <span class="tag-deferred">Step 4</span>
+              <span id="history-count-badge" class="history-count-badge" hidden>0</span>
             </button>
           </li>
           <li class="nav-item">
@@ -86,14 +108,13 @@
 
       <div class="sidebar-footer">
         <div class="settings-item">
-          <button class="nav-btn" data-feature="Settings" data-step="Step 5" id="nav-settings">
+          <button class="nav-btn" id="nav-settings">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <circle cx="12" cy="12" r="3"></circle>
               <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
             </svg>
             <span>Settings</span>
-            <span class="tag-deferred">Step 5</span>
-          </button>
+            </button>
         </div>
 
         <div class="runtime-info-card">
@@ -318,7 +339,7 @@
             <div id="panel-body" class="subtab-panel" role="tabpanel" hidden>
               <!-- Notice when method is GET or HEAD -->
               <div id="body-disabled-notice" class="method-body-warning" hidden>
-                <div class="warning-icon">⚠️</div>
+                <div class="warning-icon">âš ï¸</div>
                 <div class="warning-text">
                   <strong>Body disabled for <span id="warning-method-label">GET</span> requests.</strong>
                   HTTP specifications state that GET and HEAD requests should not contain a request body. To send payload data, select <strong>POST, PUT, PATCH,</strong> or <strong>DELETE</strong>.
@@ -349,7 +370,7 @@
                 </div>
 
                 <div id="body-error-box" class="json-error-banner" hidden>
-                  <span class="error-icon">✕</span>
+                  <span class="error-icon">âœ•</span>
                   <span id="body-error-msg" class="error-msg">Syntax Error</span>
                 </div>
               </div>
@@ -358,7 +379,7 @@
             <!-- Tests Tab Panel -->
             <div id="panel-tests" class="subtab-panel" role="tabpanel" hidden>
               <div class="future-notice">
-                <div class="future-notice-icon">🧪</div>
+                <div class="future-notice-icon">ðŸ§ª</div>
                 <div class="future-notice-text">
                   <h4>Response Assertions & Tests</h4>
                   <p>Automated response validations (HTTP status checks, JSON path assertions, Spring Boot actuator tests) will be implemented in later steps.</p>
@@ -389,15 +410,15 @@
           <div class="response-meta-stats">
             <span class="stat-item" id="stat-status-wrapper">
               <span class="stat-label">Status:</span>
-              <span id="stat-status" class="stat-val empty">—</span>
+              <span id="stat-status" class="stat-val empty">â€”</span>
             </span>
             <span class="stat-item">
               <span class="stat-label">Time:</span>
-              <span id="stat-time" class="stat-val empty">—</span>
+              <span id="stat-time" class="stat-val empty">â€”</span>
             </span>
             <span class="stat-item">
               <span class="stat-label">Size:</span>
-              <span id="stat-size" class="stat-val empty">—</span>
+              <span id="stat-size" class="stat-val empty">â€”</span>
             </span>
           </div>
         </div>
@@ -415,7 +436,7 @@
             <h3 class="empty-state-title">No response yet</h3>
             <p class="empty-state-desc">Configure a request and send it to see the response.</p>
             <div class="empty-state-hint">
-              <span class="hint-pill">HTTP Engine Ready · Collections Persistence Active</span>
+              <span class="hint-pill">HTTP Engine Ready Â· Collections Persistence Active</span>
             </div>
           </div>
 
@@ -474,7 +495,7 @@
               <!-- Body Preformatted Container -->
               <div class="response-viewer-code-container">
                 <div id="response-empty-body-notice" class="empty-body-notice" hidden>
-                  <span class="empty-body-icon">ℹ️</span>
+                  <span class="empty-body-icon">â„¹ï¸</span>
                   <span>Empty response body (HTTP <span id="empty-body-status">204 No Content</span>)</span>
                 </div>
                 <pre id="response-body-pre" class="response-body-pre" tabindex="0"></pre>
@@ -638,6 +659,122 @@
     </div>
   </div>
 
+
+  <!-- ======================================================================= -->
+  <!-- Settings Modal (Step 4)                                                  -->
+  <!-- ======================================================================= -->
+  <div id="modal-settings" class="modal-card modal-settings-card" role="dialog" aria-labelledby="modal-settings-title" hidden>
+    <div class="modal-header">
+      <h3 id="modal-settings-title">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-3px;margin-right:8px">
+          <circle cx="12" cy="12" r="3"></circle>
+          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+        </svg>
+        Application Settings
+      </h3>
+      <button class="btn-modal-close" id="btn-close-settings-modal" aria-label="Close Settings">&times;</button>
+    </div>
+    <div class="modal-body settings-modal-body">
+
+      <!-- Theme Section -->
+      <div class="settings-section">
+        <div class="settings-section-title">Appearance</div>
+        <div class="form-group settings-form-group">
+          <label class="form-label" for="settings-theme">Color Theme</label>
+          <div class="theme-toggle-group" role="radiogroup" aria-label="Select theme">
+            <button id="btn-theme-dark" class="theme-toggle-btn theme-active" data-theme="dark" aria-pressed="true">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+              Dark
+            </button>
+            <button id="btn-theme-light" class="theme-toggle-btn" data-theme="light" aria-pressed="false">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+              Light
+            </button>
+          </div>
+          <input type="hidden" id="settings-theme" value="dark">
+        </div>
+      </div>
+
+      <!-- Requests Section -->
+      <div class="settings-section">
+        <div class="settings-section-title">Requests</div>
+        <div class="form-group settings-form-group">
+          <label class="form-label" for="settings-timeout">
+            Request Timeout
+            <span class="settings-help-text">Milliseconds before a request is aborted</span>
+          </label>
+          <div class="settings-input-row">
+            <input
+              type="number"
+              id="settings-timeout"
+              class="form-input settings-number-input"
+              min="1000"
+              max="120000"
+              step="1000"
+              value="15000"
+              aria-label="Request timeout in milliseconds"
+            >
+            <span class="settings-unit-label">ms</span>
+            <span id="settings-timeout-display" class="settings-computed-display">15 seconds</span>
+          </div>
+          <div id="settings-timeout-error" class="settings-field-error" hidden></div>
+        </div>
+      </div>
+
+      <!-- History Section -->
+      <div class="settings-section">
+        <div class="settings-section-title">History</div>
+        <div class="form-group settings-form-group">
+          <label class="form-label" for="settings-history-limit">
+            History Limit
+            <span class="settings-help-text">Maximum number of entries to retain</span>
+          </label>
+          <div class="settings-input-row">
+            <input
+              type="number"
+              id="settings-history-limit"
+              class="form-input settings-number-input"
+              min="10"
+              max="1000"
+              step="10"
+              value="100"
+              aria-label="Maximum history entries"
+            >
+            <span class="settings-unit-label">entries</span>
+          </div>
+          <div id="settings-history-limit-error" class="settings-field-error" hidden></div>
+        </div>
+      </div>
+
+    </div>
+    <div class="modal-footer settings-modal-footer">
+      <button class="btn btn-ghost btn-sm" id="btn-reset-settings">Reset to Defaults</button>
+      <div class="settings-footer-actions">
+        <button class="btn btn-secondary btn-sm" id="btn-cancel-settings-modal">Cancel</button>
+        <button class="btn btn-primary btn-sm" id="btn-save-settings">Save Settings</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Clear History Confirm Modal -->
+  <div id="modal-clear-history" class="modal-card" role="dialog" aria-labelledby="modal-clear-hist-title" hidden>
+    <div class="modal-header">
+      <h3 id="modal-clear-hist-title">Clear All History</h3>
+      <button class="btn-modal-close" id="btn-close-clear-hist-modal">&times;</button>
+    </div>
+    <div class="modal-body">
+      <p class="delete-confirm-msg">Are you sure you want to clear all request history?</p>
+      <p class="delete-warning-sub">This operation is permanent and cannot be undone.</p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary btn-sm" id="btn-cancel-clear-hist-modal">Cancel</button>
+      <button class="btn btn-danger btn-sm" id="btn-confirm-clear-hist-modal">Clear All History</button>
+    </div>
+  </div>
+
   <script src="scripts/renderer.js"></script>
 </body>
 </html>
+
+
+

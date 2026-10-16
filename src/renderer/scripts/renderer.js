@@ -1,5 +1,5 @@
-/**
- * ApiForge Lite — Spring Edition
+﻿/**
+ * ApiForge Lite â€” Spring Edition
  * Renderer Process Controller (Step 3: Collections, Folders, and Request Management)
  */
 
@@ -15,7 +15,10 @@
     collectionsTree: [],
     expandedNodes: new Set(),
     activeModal: null,
-    pendingModalAction: null
+    pendingModalAction: null,
+    history: [],
+    settings: { requestTimeoutMs: 15000, historyLimit: 100, theme: 'dark' },
+    historyPanelOpen: false
   };
 
   // DOM Elements Cache
@@ -151,8 +154,48 @@
     btnCloseDelModal: document.getElementById('btn-close-del-modal'),
     deleteConfirmMessage: document.getElementById('delete-confirm-message'),
     btnCancelDelModal: document.getElementById('btn-cancel-del-modal'),
-    btnConfirmDelModal: document.getElementById('btn-confirm-del-modal')
+    btnConfirmDelModal: document.getElementById('btn-confirm-del-modal'),
+
+    // Step 4: History & Settings
+    navHistory: document.getElementById('nav-history'),
+    navSettings: document.getElementById('nav-settings'),
+    historyPanel: document.getElementById('history-panel'),
+    historyList: document.getElementById('history-list'),
+    historyCountBadge: document.getElementById('history-count-badge'),
+    btnClearHistory: document.getElementById('btn-clear-history'),
+
+    // Settings Modal
+    modalSettings: document.getElementById('modal-settings'),
+    btnCloseSettingsModal: document.getElementById('btn-close-settings-modal'),
+    btnCancelSettingsModal: document.getElementById('btn-cancel-settings-modal'),
+    btnSaveSettings: document.getElementById('btn-save-settings'),
+    btnResetSettings: document.getElementById('btn-reset-settings'),
+    settingsTheme: document.getElementById('settings-theme'),
+    btnThemeDark: document.getElementById('btn-theme-dark'),
+    btnThemeLight: document.getElementById('btn-theme-light'),
+    settingsTimeout: document.getElementById('settings-timeout'),
+    settingsTimeoutDisplay: document.getElementById('settings-timeout-display'),
+    settingsTimeoutError: document.getElementById('settings-timeout-error'),
+    settingsHistoryLimit: document.getElementById('settings-history-limit'),
+    settingsHistoryLimitError: document.getElementById('settings-history-limit-error'),
+
+    // Clear History Confirm Modal
+    modalClearHistory: document.getElementById('modal-clear-history'),
+    btnCloseClrHistModal: document.getElementById('btn-close-clear-hist-modal'),
+    btnCancelClrHistModal: document.getElementById('btn-cancel-clear-hist-modal'),
+    btnConfirmClrHistModal: document.getElementById('btn-confirm-clear-hist-modal')
   };
+
+  // Helper: Escape HTML to prevent XSS in dynamic templates
+  function escapeHtml(str) {
+    if (!str || typeof str !== 'string') return '';
+    return str
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
+  }
 
   // Helper: Format byte counts cleanly
   function formatBytes(bytes) {
@@ -1015,7 +1058,7 @@
       params: tab.params,
       headers: tab.headers,
       body: tab.method === 'GET' || tab.method === 'HEAD' ? null : tab.body || null,
-      timeoutMs: 15000
+      timeoutMs: state.settings.requestTimeoutMs || 15000
     };
 
     try {
@@ -1033,12 +1076,35 @@
         tab.error = null;
         renderResponseWorkspace();
         showToast(`${tab.method} completed: HTTP ${result.response.status} (${result.response.timeMs} ms)`, 'success');
+        // Record history entry (success)
+        recordHistory({
+          method: tab.method,
+          url: trimmedUrl,
+          params: tab.params,
+          headers: tab.headers,
+          status: result.response.status,
+          durationMs: result.response.timeMs,
+          bodyPreview: typeof result.response.body === 'string' ? result.response.body : '',
+          isNetworkError: false
+        });
       } else {
         tab.responseState = 'error';
         tab.error = result.error || { type: 'UNKNOWN', message: 'Request failed', details: 'No response received' };
         tab.response = null;
         renderResponseWorkspace();
         showToast(`Request failed: ${tab.error.message}`, 'error');
+        // Record history entry (network error)
+        recordHistory({
+          method: tab.method,
+          url: trimmedUrl,
+          params: tab.params,
+          headers: tab.headers,
+          status: null,
+          durationMs: 0,
+          bodyPreview: '',
+          isNetworkError: true,
+          errorMessage: tab.error.message || 'Request failed'
+        });
       }
     } catch (ipcErr) {
       if (tab.activeRequestId === requestPayload.requestId) {
@@ -1047,6 +1113,17 @@
         tab.error = { type: 'BRIDGE_ERROR', message: 'IPC bridge error', details: ipcErr.message };
         renderResponseWorkspace();
         showToast('IPC Bridge failure: ' + ipcErr.message, 'error');
+        recordHistory({
+          method: tab.method,
+          url: trimmedUrl,
+          params: tab.params,
+          headers: tab.headers,
+          status: null,
+          durationMs: 0,
+          bodyPreview: '',
+          isNetworkError: true,
+          errorMessage: ipcErr.message || 'IPC Bridge failure'
+        });
       }
     }
   }
@@ -1675,7 +1752,7 @@
         }
         elements.saveTargetFolder.appendChild(opt);
         if (f.children && f.children.length > 0) {
-          addFolderOptions(f.children, prefix + '— ');
+          addFolderOptions(f.children, prefix + 'â€” ');
         }
       });
     }
@@ -1760,6 +1837,8 @@
     if (elements.modalFolder) elements.modalFolder.hidden = true;
     if (elements.modalRenameRequest) elements.modalRenameRequest.hidden = true;
     if (elements.modalDelete) elements.modalDelete.hidden = true;
+    if (elements.modalSettings) elements.modalSettings.hidden = true;
+    if (elements.modalClearHistory) elements.modalClearHistory.hidden = true;
     state.activeModal = null;
     state.pendingModalAction = null;
   }
@@ -2219,6 +2298,74 @@
       });
     });
 
+
+    // ------------------------------------------------------------------------
+    // Step 4: History & Settings Event Bindings
+    // ------------------------------------------------------------------------
+
+    // History Panel toggle
+    if (elements.navHistory) {
+      elements.navHistory.addEventListener('click', () => {
+        toggleHistoryPanel();
+      });
+    }
+
+    // Clear History Button (opens confirm modal)
+    if (elements.btnClearHistory) {
+      elements.btnClearHistory.addEventListener('click', () => {
+        openModal(elements.modalClearHistory);
+      });
+    }
+
+    // Clear History Modal actions
+    if (elements.btnConfirmClrHistModal) {
+      elements.btnConfirmClrHistModal.addEventListener('click', clearAllHistory);
+    }
+    if (elements.btnCancelClrHistModal) {
+      elements.btnCancelClrHistModal.addEventListener('click', closeActiveModal);
+    }
+    if (elements.btnCloseClrHistModal) {
+      elements.btnCloseClrHistModal.addEventListener('click', closeActiveModal);
+    }
+
+    // Settings Modal
+    if (elements.navSettings) {
+      elements.navSettings.addEventListener('click', () => {
+        openSettingsModal();
+      });
+    }
+    if (elements.btnCloseSettingsModal) {
+      elements.btnCloseSettingsModal.addEventListener('click', closeActiveModal);
+    }
+    if (elements.btnCancelSettingsModal) {
+      elements.btnCancelSettingsModal.addEventListener('click', closeActiveModal);
+    }
+    if (elements.btnSaveSettings) {
+      elements.btnSaveSettings.addEventListener('click', saveSettingsFromModal);
+    }
+    if (elements.btnResetSettings) {
+      elements.btnResetSettings.addEventListener('click', resetSettingsFromModal);
+    }
+
+    // Theme toggles inside settings modal
+    if (elements.btnThemeDark) {
+      elements.btnThemeDark.addEventListener('click', () => {
+        applyTheme('dark');
+      });
+    }
+    if (elements.btnThemeLight) {
+      elements.btnThemeLight.addEventListener('click', () => {
+        applyTheme('light');
+      });
+    }
+
+    // Timeout display updater
+    if (elements.settingsTimeout) {
+      elements.settingsTimeout.addEventListener('input', () => {
+        updateTimeoutDisplay(elements.settingsTimeout.value);
+      });
+    }
+
     // 16. Keyboard Shortcuts (Ctrl+S, Ctrl+N, Ctrl+Enter, Esc)
     window.addEventListener('keydown', (e) => {
       if (e.key === 'Escape' && state.activeModal) {
@@ -2244,6 +2391,10 @@
             elements.btnConfirmRenameReqModal.click();
           } else if (state.activeModal === elements.modalDelete && elements.btnConfirmDelModal) {
             elements.btnConfirmDelModal.click();
+          } else if (state.activeModal === elements.modalSettings && elements.btnSaveSettings) {
+            elements.btnSaveSettings.click();
+          } else if (state.activeModal === elements.modalClearHistory && elements.btnConfirmClrHistModal) {
+            elements.btnConfirmClrHistModal.click();
           }
         } else {
           e.preventDefault();
@@ -2253,14 +2404,380 @@
     });
   }
 
+
+  // ==========================================================================
+  // Step 4: History & Settings Implementation Functions
+  // ==========================================================================
+
+  async function loadSettings() {
+    if (!window.apiForge || !window.apiForge.getSettings) return;
+    try {
+      const s = await window.apiForge.getSettings();
+      if (s) {
+        state.settings = { ...state.settings, ...s };
+      }
+      applyTheme(state.settings.theme);
+    } catch (err) {
+      console.warn('[Renderer] Failed to load settings:', err);
+    }
+  }
+
+  function applyTheme(theme) {
+    const valid = (theme === 'light') ? 'light' : 'dark';
+    state.settings.theme = valid;
+
+    if (valid === 'light') {
+      document.body.classList.add('theme-light');
+      document.documentElement.setAttribute('data-theme', 'light');
+    } else {
+      document.body.classList.remove('theme-light');
+      document.documentElement.setAttribute('data-theme', 'dark');
+    }
+
+    if (elements.settingsTheme) elements.settingsTheme.value = valid;
+
+    if (elements.btnThemeDark && elements.btnThemeLight) {
+      if (valid === 'light') {
+        elements.btnThemeLight.classList.add('theme-active');
+        elements.btnThemeLight.setAttribute('aria-pressed', 'true');
+        elements.btnThemeDark.classList.remove('theme-active');
+        elements.btnThemeDark.setAttribute('aria-pressed', 'false');
+      } else {
+        elements.btnThemeDark.classList.add('theme-active');
+        elements.btnThemeDark.setAttribute('aria-pressed', 'true');
+        elements.btnThemeLight.classList.remove('theme-active');
+        elements.btnThemeLight.setAttribute('aria-pressed', 'false');
+      }
+    }
+  }
+
+  function updateTimeoutDisplay(msVal) {
+    if (!elements.settingsTimeoutDisplay) return;
+    const ms = Number(msVal);
+    if (!isNaN(ms) && ms >= 1000) {
+      const sec = (ms / 1000).toFixed(1).replace(/\.0$/, '');
+      elements.settingsTimeoutDisplay.textContent = `${sec} second${sec === '1' ? '' : 's'}`;
+    } else {
+      elements.settingsTimeoutDisplay.textContent = `${msVal} ms`;
+    }
+  }
+
+  function openSettingsModal() {
+    if (!elements.modalSettings) return;
+
+    if (elements.settingsTimeout) {
+      elements.settingsTimeout.value = state.settings.requestTimeoutMs || 15000;
+      updateTimeoutDisplay(state.settings.requestTimeoutMs || 15000);
+    }
+    if (elements.settingsHistoryLimit) {
+      elements.settingsHistoryLimit.value = state.settings.historyLimit || 100;
+    }
+
+    applyTheme(state.settings.theme || 'dark');
+
+    if (elements.settingsTimeoutError) elements.settingsTimeoutError.hidden = true;
+    if (elements.settingsHistoryLimitError) elements.settingsHistoryLimitError.hidden = true;
+
+    openModal(elements.modalSettings);
+  }
+
+  async function saveSettingsFromModal() {
+    if (!window.apiForge || !window.apiForge.saveSettings) return;
+
+    const timeoutInput = elements.settingsTimeout ? parseInt(elements.settingsTimeout.value, 10) : 15000;
+    const limitInput = elements.settingsHistoryLimit ? parseInt(elements.settingsHistoryLimit.value, 10) : 100;
+    const themeInput = elements.settingsTheme ? elements.settingsTheme.value : 'dark';
+
+    let hasError = false;
+
+    if (isNaN(timeoutInput) || timeoutInput < 1000 || timeoutInput > 120000) {
+      if (elements.settingsTimeoutError) {
+        elements.settingsTimeoutError.textContent = 'Timeout must be an integer between 1,000 and 120,000 ms.';
+        elements.settingsTimeoutError.hidden = false;
+      }
+      hasError = true;
+    } else if (elements.settingsTimeoutError) {
+      elements.settingsTimeoutError.hidden = true;
+    }
+
+    if (isNaN(limitInput) || limitInput < 10 || limitInput > 1000) {
+      if (elements.settingsHistoryLimitError) {
+        elements.settingsHistoryLimitError.textContent = 'History limit must be an integer between 10 and 1,000.';
+        elements.settingsHistoryLimitError.hidden = false;
+      }
+      hasError = true;
+    } else if (elements.settingsHistoryLimitError) {
+      elements.settingsHistoryLimitError.hidden = true;
+    }
+
+    if (hasError) return;
+
+    try {
+      const saved = await window.apiForge.saveSettings({
+        requestTimeoutMs: timeoutInput,
+        historyLimit: limitInput,
+        theme: themeInput
+      });
+
+      state.settings = saved;
+      applyTheme(saved.theme);
+      closeActiveModal();
+      showToast('Settings saved successfully', 'success');
+
+      // Reload history in case historyLimit was reduced and records were trimmed
+      await loadHistory();
+    } catch (err) {
+      showToast(`Failed to save settings: ${err.message}`, 'error');
+    }
+  }
+
+  async function resetSettingsFromModal() {
+    if (!window.apiForge || !window.apiForge.resetSettings) return;
+    try {
+      const def = await window.apiForge.resetSettings();
+      state.settings = def;
+      applyTheme(def.theme);
+
+      if (elements.settingsTimeout) elements.settingsTimeout.value = def.requestTimeoutMs;
+      updateTimeoutDisplay(def.requestTimeoutMs);
+      if (elements.settingsHistoryLimit) elements.settingsHistoryLimit.value = def.historyLimit;
+
+      if (elements.settingsTimeoutError) elements.settingsTimeoutError.hidden = true;
+      if (elements.settingsHistoryLimitError) elements.settingsHistoryLimitError.hidden = true;
+
+      await loadHistory();
+      showToast('Settings reset to defaults', 'info');
+    } catch (err) {
+      showToast(`Failed to reset settings: ${err.message}`, 'error');
+    }
+  }
+
+  async function loadHistory() {
+    if (!window.apiForge || !window.apiForge.getHistory) return;
+    try {
+      const entries = await window.apiForge.getHistory();
+      state.history = Array.isArray(entries) ? entries : [];
+      updateHistoryBadge();
+      renderHistoryList();
+    } catch (err) {
+      console.warn('[Renderer] Failed to load history:', err);
+    }
+  }
+
+  function updateHistoryBadge() {
+    if (!elements.historyCountBadge) return;
+    const count = (state.history || []).length;
+    elements.historyCountBadge.textContent = count;
+    elements.historyCountBadge.hidden = count === 0;
+  }
+
+  function formatHistoryTime(timestamp) {
+    if (!timestamp) return '';
+    try {
+      const d = new Date(timestamp);
+      return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    } catch (_) {
+      return '';
+    }
+  }
+
+  function renderHistoryList() {
+    if (!elements.historyList) return;
+
+    if (!state.history || state.history.length === 0) {
+      elements.historyList.innerHTML = `
+        <div class="history-empty-state">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.3">
+            <circle cx="12" cy="12" r="10"></circle>
+            <polyline points="12 6 12 12 16 14"></polyline>
+          </svg>
+          <p>No history yet</p>
+          <span>Send a request to begin recording</span>
+        </div>
+      `;
+      return;
+    }
+
+    elements.historyList.innerHTML = '';
+    state.history.forEach(entry => {
+      const itemEl = document.createElement('div');
+      itemEl.className = 'history-entry';
+      itemEl.setAttribute('role', 'button');
+      itemEl.setAttribute('tabindex', '0');
+      itemEl.setAttribute('data-history-id', entry.id);
+
+      const methodLower = (entry.method || 'GET').toLowerCase();
+      let statusHtml = '';
+      if (entry.isNetworkError) {
+        statusHtml = `<span class="history-entry-error-badge" title="${escapeHtml(entry.errorMessage || 'Network error')}">NET ERR</span>`;
+      } else if (typeof entry.status === 'number') {
+        const s = entry.status;
+        const colorClass = s >= 200 && s < 300 ? 'status-2xx' : s >= 300 && s < 400 ? 'status-3xx' : s >= 400 && s < 500 ? 'status-4xx' : 'status-5xx';
+        statusHtml = `<span class="history-entry-status ${colorClass}">${s}</span>`;
+      }
+
+      const durationHtml = entry.durationMs ? `<span class="history-entry-duration">${entry.durationMs}ms</span>` : '';
+      const timeStr = formatHistoryTime(entry.timestamp);
+
+      itemEl.innerHTML = `
+        <span class="history-entry-method method-${methodLower}">${escapeHtml(entry.method || 'GET')}</span>
+        <div class="history-entry-info">
+          <div class="history-entry-url" title="${escapeHtml(entry.url || '')}">${escapeHtml(entry.url || '(Empty URL)')}</div>
+          <div class="history-entry-meta">
+            <span class="history-entry-time">${timeStr}</span>
+            ${statusHtml}
+            ${durationHtml}
+          </div>
+        </div>
+      `;
+
+      itemEl.addEventListener('click', () => {
+        restoreHistoryEntry(entry);
+      });
+
+      itemEl.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          restoreHistoryEntry(entry);
+        }
+      });
+
+      elements.historyList.appendChild(itemEl);
+    });
+  }
+
+  function restoreHistoryEntry(entry) {
+    if (!entry) return;
+
+    let tab = getActiveTab();
+    if (!tab) {
+      tab = createTab();
+    }
+
+    tab.method = entry.method || 'GET';
+    tab.url = entry.url || '';
+
+    // Restore query params
+    if (Array.isArray(entry.params) && entry.params.length > 0) {
+      tab.params = JSON.parse(JSON.stringify(entry.params));
+    } else {
+      // Parse params from URL
+      try {
+        const parsedUrl = new URL(tab.url, 'http://localhost');
+        const searchParams = Array.from(parsedUrl.searchParams.entries()).map(([k, v]) => ({
+          key: k,
+          value: v,
+          enabled: true
+        }));
+        tab.params = searchParams.length > 0 ? searchParams : [{ key: '', value: '', enabled: true }];
+      } catch (_) {
+        tab.params = [{ key: '', value: '', enabled: true }];
+      }
+    }
+
+    // Restore headers (check if any sensitive were redacted)
+    let hadRedacted = false;
+    if (Array.isArray(entry.requestHeaders) && entry.requestHeaders.length > 0) {
+      tab.headers = entry.requestHeaders.map(h => {
+        if (h.value === '***') {
+          hadRedacted = true;
+        }
+        return { key: h.key, value: h.value, enabled: h.enabled !== false };
+      });
+    }
+
+    // Update tab title
+    try {
+      const u = new URL(tab.url);
+      tab.title = `${tab.method} ${u.pathname === '/' ? u.hostname : u.pathname}`;
+    } catch (_) {
+      tab.title = tab.url ? `${tab.method} ${tab.url.slice(0, 20)}` : `${tab.method} Request`;
+    }
+
+    setActiveTab(tab.id);
+
+    if (hadRedacted) {
+      showToast('Restored request from history. Sensitive header values (***) must be re-entered.', 'warning');
+    } else {
+      showToast(`Restored ${tab.method} request into active tab`, 'info');
+    }
+  }
+
+  async function recordHistory(opts) {
+    if (!window.apiForge || !window.apiForge.addHistoryEntry) return;
+    try {
+      const saved = await window.apiForge.addHistoryEntry(opts);
+      if (saved) {
+        state.history.unshift(saved);
+        const limit = (state.settings && state.settings.historyLimit) || 100;
+        if (state.history.length > limit) {
+          state.history.splice(limit);
+        }
+        updateHistoryBadge();
+        renderHistoryList();
+      }
+    } catch (err) {
+      console.warn('[Renderer] Failed to record history entry:', err);
+    }
+  }
+
+  async function clearAllHistory() {
+    if (!window.apiForge || !window.apiForge.clearHistory) return;
+    try {
+      await window.apiForge.clearHistory();
+      state.history = [];
+      updateHistoryBadge();
+      renderHistoryList();
+      closeActiveModal();
+      showToast('Request history cleared', 'info');
+    } catch (err) {
+      showToast(`Failed to clear history: ${err.message}`, 'error');
+    }
+  }
+
+  function toggleHistoryPanel() {
+    if (!elements.historyPanel) return;
+    const isHidden = elements.historyPanel.hidden;
+    elements.historyPanel.hidden = !isHidden;
+    state.historyPanelOpen = !isHidden;
+
+    if (elements.navHistory) {
+      elements.navHistory.setAttribute('aria-pressed', String(!isHidden));
+      if (!isHidden) {
+        elements.navHistory.classList.add('nav-btn-active');
+      } else {
+        elements.navHistory.classList.remove('nav-btn-active');
+      }
+    }
+
+    if (!isHidden) {
+      loadHistory();
+    }
+  }
+
   // ==========================================================================
   // App Bootstrap
   // ==========================================================================
 
-  document.addEventListener('DOMContentLoaded', () => {
+  document.addEventListener('DOMContentLoaded', async () => {
     initializeBridge();
     createTab({ title: 'New Request', method: 'GET', url: '' });
     bindEvents();
     loadCollectionsTree();
+    await loadSettings();
+    await loadHistory();
+    // Show history panel by default so it's readily accessible
+    if (elements.historyPanel) {
+      elements.historyPanel.hidden = false;
+      state.historyPanelOpen = true;
+      if (elements.navHistory) {
+        elements.navHistory.setAttribute('aria-pressed', 'true');
+        elements.navHistory.classList.add('nav-btn-active');
+      }
+    }
   });
 })();
+
+
+
+

@@ -1,7 +1,7 @@
-const { contextBridge, ipcRenderer } = require('electron');
+﻿const { contextBridge, ipcRenderer } = require('electron');
 
 /**
- * ApiForge Lite Secure Preload Bridge (Step 3)
+ * ApiForge Lite Secure Preload Bridge (Step 4)
  *
  * Exposes strictly explicit, frozen methods under window.apiForge.
  * Direct access to ipcRenderer, Node.js globals, filesystem, and arbitrary IPC channels is blocked.
@@ -102,8 +102,40 @@ const apiForgeBridge = Object.freeze({
 
   duplicateRequest: async (collectionId, requestId) => {
     return ipcRenderer.invoke('collections:duplicate-request', { collectionId, requestId });
+  },
+  // =========================================================================
+  // History Storage APIs (Step 4)
+  // =========================================================================
+
+  getHistory: async () => {
+    return ipcRenderer.invoke('history:get');
+  },
+
+  addHistoryEntry: async (entryData) => {
+    return ipcRenderer.invoke('history:add', entryData);
+  },
+
+  clearHistory: async () => {
+    return ipcRenderer.invoke('history:clear');
+  },
+
+  // =========================================================================
+  // Settings Storage APIs (Step 4)
+  // =========================================================================
+
+  getSettings: async () => {
+    return ipcRenderer.invoke('settings:get');
+  },
+
+  saveSettings: async (settings) => {
+    return ipcRenderer.invoke('settings:save', settings);
+  },
+
+  resetSettings: async () => {
+    return ipcRenderer.invoke('settings:reset');
   }
 });
 
 // Expose safe API to the renderer process
 contextBridge.exposeInMainWorld('apiForge', apiForgeBridge);
+

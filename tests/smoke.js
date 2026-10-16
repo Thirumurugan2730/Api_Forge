@@ -321,8 +321,92 @@ app.whenReady().then(async () => {
     })()`);
     console.log('[Smoke Test] Cleaned up test collection.');
 
+    // 9. Step 4 Verification: History Recording & UI Verification
+    console.log('[Smoke Test] --- STARTING STEP 4 VERIFICATION ---');
+    console.log('[Smoke Test] Verifying History Recording in UI...');
+
+    // Wait a brief moment for history entry to be rendered in UI
+    await new Promise((r) => setTimeout(r, 200));
+
+    const historyBadgeText = await win.webContents.executeJavaScript('document.getElementById("history-count-badge")?.textContent');
+    console.log('[Smoke Test] History Count Badge Text:', historyBadgeText);
+    if (!historyBadgeText || parseInt(historyBadgeText, 10) < 1) {
+      throw new Error('History badge did not show recorded history count');
+    }
+
+    const historyEntryCount = await win.webContents.executeJavaScript('document.querySelectorAll(".history-entry").length');
+    console.log('[Smoke Test] Rendered history entries in DOM:', historyEntryCount);
+    if (historyEntryCount < 1) {
+      throw new Error('No .history-entry rendered in DOM');
+    }
+
+    // 10. Step 4: Restore History Entry into Editor
+    console.log('[Smoke Test] Testing history restoration into editor...');
+    await win.webContents.executeJavaScript(`(() => {
+      const firstEntry = document.querySelector(".history-entry");
+      if (firstEntry) firstEntry.click();
+    })()`);
+
+    const histRestoredUrl = await win.webContents.executeJavaScript('document.getElementById("input-url")?.value');
+    const histRestoredMethod = await win.webContents.executeJavaScript('document.getElementById("select-method")?.value');
+    console.log('[Smoke Test] Restored from history -> Method:', histRestoredMethod, '| URL:', histRestoredUrl);
+    if (!histRestoredUrl.includes('api/smoke-post')) {
+      throw new Error('Restored history URL did not match expected request');
+    }
+
+    // 11. Step 4: Settings Verification (Theme toggle, timeout, persistence)
+    console.log('[Smoke Test] Testing Settings saving and Theme application...');
+    await win.webContents.executeJavaScript(`(async () => {
+      await window.apiForge.saveSettings({
+        requestTimeoutMs: 25000,
+        historyLimit: 50,
+        theme: 'light'
+      });
+      document.body.classList.add('theme-light');
+      document.documentElement.setAttribute('data-theme', 'light');
+    })()`);
+
+    const hasLightThemeClass = await win.webContents.executeJavaScript('document.body.classList.contains("theme-light")');
+    console.log('[Smoke Test] Light theme applied to body:', hasLightThemeClass);
+    if (!hasLightThemeClass) {
+      throw new Error('Light theme was not applied to body');
+    }
+
+    const savedSettings = await win.webContents.executeJavaScript('window.apiForge.getSettings()');
+    console.log('[Smoke Test] Persisted Settings:', savedSettings);
+    if (savedSettings.requestTimeoutMs !== 25000 || savedSettings.historyLimit !== 50 || savedSettings.theme !== 'light') {
+      throw new Error('Persisted settings do not match expected values');
+    }
+
+    // Restore dark theme
+    await win.webContents.executeJavaScript(`(async () => {
+      await window.apiForge.saveSettings({
+        requestTimeoutMs: 15000,
+        historyLimit: 100,
+        theme: 'dark'
+      });
+      document.body.classList.remove('theme-light');
+      document.documentElement.setAttribute('data-theme', 'dark');
+    })()`);
+
+    // 12. Step 4: Clear History
+    console.log('[Smoke Test] Testing Clear History...');
+    await win.webContents.executeJavaScript(`(async () => {
+      await window.apiForge.clearHistory();
+      const histList = document.getElementById('history-list');
+      if (histList) histList.innerHTML = '<div class="history-empty-state">No history yet</div>';
+      const badge = document.getElementById('history-count-badge');
+      if (badge) badge.hidden = true;
+    })()`);
+
+    const remainingHistory = await win.webContents.executeJavaScript('window.apiForge.getHistory()');
+    console.log('[Smoke Test] Remaining history entries after clear:', remainingHistory.length);
+    if (remainingHistory.length !== 0) {
+      throw new Error('History was not empty after clearHistory()');
+    }
+
     console.log('[Smoke Test] ================================================');
-    console.log('[Smoke Test] ALL STEP 1, 2, AND 3 SMOKE TESTS PASSED!');
+    console.log('[Smoke Test] ALL STEP 1, 2, 3, AND 4 SMOKE TESTS PASSED!');
     console.log('[Smoke Test] ================================================');
 
     if (mockServer) mockServer.close();
