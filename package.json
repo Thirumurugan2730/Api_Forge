@@ -1,0 +1,25 @@
+{
+  "name": "apiforge-lite",
+  "version": "0.1.0",
+  "description": "ApiForge Lite - Spring Edition: Lightweight desktop API client for Spring Boot developers",
+  "main": "src/main/main.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron .",
+    "test": "node --test tests/foundation.test.js",
+    "test:smoke": "electron tests/smoke.js"
+  },
+  "keywords": [
+    "electron",
+    "api-client",
+    "spring-boot",
+    "rest",
+    "developer-tools"
+  ],
+  "author": "ApiForge Team",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "33.2.1"
+  }
+}

@@ -1,0 +1,308 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'none'; font-src 'self';">
+  <title>ApiForge Lite — Spring Edition</title>
+  <link rel="stylesheet" href="styles/main.css">
+</head>
+<body class="theme-dark">
+  <div id="app" class="app-container">
+    <!-- Left Sidebar -->
+    <aside class="sidebar" aria-label="Main Navigation">
+      <div class="sidebar-header">
+        <div class="brand">
+          <div class="brand-logo" aria-hidden="true">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+              <path d="M12 2L2 7L12 12L22 7L12 2Z" fill="#3b82f6" fill-opacity="0.9" />
+              <path d="M2 17L12 22L22 17" stroke="#10b981" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" />
+              <path d="M2 12L12 17L22 12" stroke="#3b82f6" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+          </div>
+          <div class="brand-text">
+            <span class="brand-title">ApiForge<span class="brand-accent">Lite</span></span>
+            <span class="brand-subtitle">Spring Edition</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="sidebar-action">
+        <button id="btn-new-request" class="btn btn-primary btn-block" title="Create a new request tab (Ctrl+N)">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+            <line x1="12" y1="5" x2="12" y2="19"></line>
+            <line x1="5" y1="12" x2="19" y2="12"></line>
+          </svg>
+          <span>New Request</span>
+          <span class="shortcut-key">Ctrl+N</span>
+        </button>
+      </div>
+
+      <nav class="sidebar-nav">
+        <div class="nav-section-title">WORKSPACE</div>
+        <ul class="nav-list">
+          <li class="nav-item">
+            <button class="nav-btn" data-feature="Collections" data-step="Step 2" id="nav-collections">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+              </svg>
+              <span>Collections</span>
+              <span class="tag-deferred">Step 2</span>
+            </button>
+          </li>
+          <li class="nav-item">
+            <button class="nav-btn" data-feature="History" data-step="Step 2" id="nav-history">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="10"></circle>
+                <polyline points="12 6 12 12 16 14"></polyline>
+              </svg>
+              <span>History</span>
+              <span class="tag-deferred">Step 2</span>
+            </button>
+          </li>
+          <li class="nav-item">
+            <button class="nav-btn" data-feature="Environments" data-step="Step 3" id="nav-environments">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="2" y="2" width="20" height="8" rx="2" ry="2"></rect>
+                <rect x="2" y="14" width="20" height="8" rx="2" ry="2"></rect>
+                <line x1="6" y1="6" x2="6.01" y2="6"></line>
+                <line x1="6" y1="18" x2="6.01" y2="18"></line>
+              </svg>
+              <span>Environments</span>
+              <span class="tag-deferred">Step 3</span>
+            </button>
+          </li>
+        </ul>
+      </nav>
+
+      <div class="sidebar-footer">
+        <div class="settings-item">
+          <button class="nav-btn" data-feature="Settings" data-step="Step 4" id="nav-settings">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="3"></circle>
+              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+            </svg>
+            <span>Settings</span>
+            <span class="tag-deferred">Step 4</span>
+          </button>
+        </div>
+
+        <div class="runtime-info-card">
+          <div class="runtime-line">
+            <span class="runtime-label">App:</span>
+            <span id="label-app-version" class="runtime-value">v0.1.0</span>
+          </div>
+          <div class="runtime-line">
+            <span class="runtime-label">Bridge:</span>
+            <span id="bridge-status-pill" class="badge-status checking">Checking...</span>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main Content Area -->
+    <main class="main-content">
+      <!-- Top Toolbar -->
+      <header class="top-toolbar" role="banner">
+        <div class="toolbar-left">
+          <div class="workspace-crumb">
+            <span class="crumb-root">Default Workspace</span>
+            <span class="crumb-separator">/</span>
+            <span class="crumb-current">Spring Boot APIs</span>
+          </div>
+        </div>
+
+        <div class="toolbar-center">
+          <div class="env-selector" title="Active Environment (Configured in Step 3)">
+            <span class="env-dot"></span>
+            <span class="env-name">No Environment</span>
+          </div>
+        </div>
+
+        <div class="toolbar-right">
+          <div id="main-status-indicator" class="main-status-chip online" title="Status of the Electron Main Process Bridge">
+            <span class="status-indicator-dot"></span>
+            <span id="status-indicator-text">Bridge: Connecting...</span>
+          </div>
+        </div>
+      </header>
+
+      <!-- Notification Toast Container -->
+      <div id="toast-container" class="toast-container" aria-live="polite"></div>
+
+      <!-- Request Workspace Area -->
+      <section class="request-workspace" aria-label="Request Workspace">
+        <!-- Request Tabs Bar -->
+        <div class="tab-strip-container">
+          <div id="request-tab-strip" class="tab-strip" role="tablist">
+            <!-- Tabs dynamically injected here -->
+          </div>
+          <button id="btn-add-tab" class="btn-tab-add" title="Open new tab (Ctrl+N)" aria-label="Add new tab">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <line x1="12" y1="5" x2="12" y2="19"></line>
+              <line x1="5" y1="12" x2="19" y2="12"></line>
+            </svg>
+          </button>
+        </div>
+
+        <!-- Request Address & Action Bar -->
+        <div class="request-address-bar">
+          <div class="method-selector-wrapper">
+            <label for="select-method" class="sr-only">HTTP Method</label>
+            <select id="select-method" class="select-method" aria-label="Select HTTP Method">
+              <option value="GET" selected>GET</option>
+              <option value="POST">POST</option>
+              <option value="PUT">PUT</option>
+              <option value="PATCH">PATCH</option>
+              <option value="DELETE">DELETE</option>
+              <option value="HEAD">HEAD</option>
+              <option value="OPTIONS">OPTIONS</option>
+            </select>
+          </div>
+
+          <div class="url-input-wrapper">
+            <label for="input-url" class="sr-only">Request URL</label>
+            <input
+              type="text"
+              id="input-url"
+              class="input-url"
+              placeholder="https://api.example.com/endpoint"
+              spellcheck="false"
+              autocomplete="off"
+            >
+          </div>
+
+          <div class="action-buttons-wrapper">
+            <button id="btn-send" class="btn btn-send" title="Send Request (Step 2 activation)">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="22" y1="2" x2="11" y2="13"></line>
+                <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+              </svg>
+              <span>Send</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Request Sub-Tabs -->
+        <div class="subtabs-container">
+          <div class="subtabs-header" role="tablist">
+            <button class="subtab-btn active" data-subtab="params" role="tab" aria-selected="true" id="tab-params">
+              <span>Params</span>
+              <span class="subtab-counter">0</span>
+            </button>
+            <button class="subtab-btn" data-subtab="headers" role="tab" aria-selected="false" id="tab-headers">
+              <span>Headers</span>
+              <span class="subtab-counter">0</span>
+            </button>
+            <button class="subtab-btn" data-subtab="body" role="tab" aria-selected="false" id="tab-body">
+              <span>Body</span>
+            </button>
+            <button class="subtab-btn" data-subtab="tests" role="tab" aria-selected="false" id="tab-tests">
+              <span>Tests</span>
+            </button>
+          </div>
+
+          <div class="subtab-content-panel">
+            <div id="panel-params" class="subtab-panel active" role="tabpanel">
+              <div class="future-notice">
+                <div class="future-notice-icon">⚙️</div>
+                <div class="future-notice-text">
+                  <h4>Query Parameters</h4>
+                  <p>Key-value parameter parsing and URL query string synchronization will be activated in <strong>Step 2</strong>. In Step 1, you can edit and prepare your full URL directly in the address bar above.</p>
+                </div>
+              </div>
+            </div>
+
+            <div id="panel-headers" class="subtab-panel" role="tabpanel" hidden>
+              <div class="future-notice">
+                <div class="future-notice-icon">📋</div>
+                <div class="future-notice-text">
+                  <h4>Request Headers</h4>
+                  <p>Custom HTTP headers (Content-Type, Authorization, Accept, custom headers) will be managed in <strong>Step 2</strong>.</p>
+                </div>
+              </div>
+            </div>
+
+            <div id="panel-body" class="subtab-panel" role="tabpanel" hidden>
+              <div class="future-notice">
+                <div class="future-notice-icon">📦</div>
+                <div class="future-notice-text">
+                  <h4>Request Body</h4>
+                  <p>JSON payloads, form data, and raw request bodies will be enabled alongside the HTTP execution engine in <strong>Step 2</strong>.</p>
+                </div>
+              </div>
+            </div>
+
+            <div id="panel-tests" class="subtab-panel" role="tabpanel" hidden>
+              <div class="future-notice">
+                <div class="future-notice-icon">🧪</div>
+                <div class="future-notice-text">
+                  <h4>Automated Tests</h4>
+                  <p>Spring Boot response assertions, status code validations, and JSON schema tests will be implemented in later steps.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Response Workspace Area -->
+      <section class="response-workspace" aria-label="Response Workspace">
+        <div class="response-header">
+          <div class="response-tabs" role="tablist">
+            <button class="resp-tab-btn active" data-resptab="body" role="tab" aria-selected="true" id="resptab-body">Body</button>
+            <button class="resp-tab-btn" data-resptab="headers" role="tab" aria-selected="false" id="resptab-headers">Headers</button>
+            <button class="resp-tab-btn" data-resptab="explain" role="tab" aria-selected="false" id="resptab-explain">
+              <span>Explain</span>
+              <span class="spring-tag">Spring</span>
+            </button>
+          </div>
+
+          <div class="response-meta-stats">
+            <span class="stat-item" id="stat-status">Status: <span class="stat-val empty">—</span></span>
+            <span class="stat-item" id="stat-time">Time: <span class="stat-val empty">—</span></span>
+            <span class="stat-item" id="stat-size">Size: <span class="stat-val empty">—</span></span>
+          </div>
+        </div>
+
+        <div class="response-body-wrapper">
+          <!-- Empty State View -->
+          <div id="response-empty-state" class="response-empty-state">
+            <div class="empty-state-graphic">
+              <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                <circle cx="12" cy="12" r="10"></circle>
+                <path d="M12 16v-4"></path>
+                <path d="M12 8h.01"></path>
+              </svg>
+            </div>
+            <h3 class="empty-state-title">No response yet</h3>
+            <p class="empty-state-desc">Configure a request and send it to see the response.</p>
+            <div class="empty-state-hint">
+              <span class="hint-pill">HTTP Engine: Step 2</span>
+            </div>
+          </div>
+
+          <!-- Step 1 Notice when Send is triggered -->
+          <div id="response-step1-feedback" class="response-feedback-box" hidden>
+            <div class="feedback-card">
+              <div class="feedback-badge">Step 1 Scope Notice</div>
+              <h4>HTTP Engine Scheduled for Step 2</h4>
+              <p>You triggered the Send action with:</p>
+              <div class="preview-request-meta">
+                <span id="preview-method-badge" class="badge-method GET">GET</span>
+                <code id="preview-url-text" class="preview-url">No URL entered</code>
+              </div>
+              <p class="feedback-detail">
+                As designed for Step 1, the network execution engine has not been connected to avoid faking simulated responses or premature API calls. Real HTTP dispatching for all 7 HTTP methods will be activated in <strong>Step 2</strong>.
+              </p>
+              <button id="btn-dismiss-feedback" class="btn btn-secondary btn-sm">Return to Empty State</button>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script src="scripts/renderer.js"></script>
+</body>
+</html>
