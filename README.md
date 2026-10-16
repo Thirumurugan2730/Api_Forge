@@ -1,57 +1,86 @@
-﻿# ApiForge Lite — Spring Edition (Step 1: Foundation)
+# ApiForge Lite — Spring Edition
 
-ApiForge Lite is a lightweight Windows desktop API client tailored specifically for Spring Boot developers.
-
-This repository contains **Step 1: Foundation**, establishing a secure, production-grade Electron desktop architecture capable of scaling to future steps without rewrites.
+ApiForge Lite is a lightweight, secure Windows desktop API client tailored specifically for Spring Boot developers.
 
 ---
 
 ## 1. Project Overview
 
-ApiForge Lite provides a focused alternative to bloated API testing clients. Designed around Spring Boot workflows, future releases will feature native OpenAPI synchronization (`/v3/api-docs`), plain-language Spring error explanations, JWT token management, and role-based test matrices.
+ApiForge Lite is designed as a focused, high-performance desktop tool for testing and developing Spring Boot APIs. It replaces bloated, slow API suites with a clean, developer-first architecture.
 
-**Step 1** strictly implements the foundational desktop shell, main process lifecycle, secure IPC communication bridge, and UI workspace.
+* **Step 1 (Completed)**: Established the Electron application shell, secure preload bridge (`window.apiForge`), context isolation, sandboxing, navigation security, and dark graphite UI.
+* **Step 2 (Completed)**: Implemented the **Real HTTP Engine**, **Interactive Request Builder**, and **Response Viewer**.
 
 ---
 
-## 2. Features Implemented in Step 1
+## 2. Features Implemented in Step 2
 
-* **Hardened Electron Security Shell**:
-  * `contextIsolation: true` strictly enforced.
-  * `nodeIntegration: false` strictly enforced.
-  * Process sandboxing enabled (`sandbox: true`).
-  * Restrictive Content Security Policy (`default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'none'; font-src 'self';`). No `unsafe-eval`.
-  * External navigation lockdown: Blocks unauthorized web requests, links, webviews, and popups.
-  * Hardware and system permissions denied by default.
-* **Preload IPC Bridge (`window.apiForge`)**:
-  * Exposes only a single, frozen contract method: `window.apiForge.getAppInfo()`.
-  * Node.js globals, `ipcRenderer`, filesystem access, and unrestricted IPC channels are shielded from the renderer.
-  * Validates all incoming arguments in the main process with type, length, and prototype integrity checks.
-* **Developer-Centric Dark Desktop UI**:
-  * **Left Sidebar**: Custom Spring-themed brand mark, application title, `+ New Request` action, navigation entries with honest phase tags (`Collections [Step 2]`, `History [Step 2]`, `Environments [Step 3]`, `Settings [Step 4]`), and live runtime version indicators.
-  * **Top Toolbar**: Workspace breadcrumb hierarchy, environment indicator, and live Electron bridge status chip.
-  * **Request Workspace**: Dynamic multi-tab management, HTTP method selector (`GET`, `POST`, `PUT`, `PATCH`, `DELETE`, `HEAD`, `OPTIONS`) with method-specific color tags, URL input, and sub-tab panels (`Params`, `Headers`, `Body`, `Tests`).
-  * **Response Workspace**: Clean empty state (`"No response yet"`), response metric slots, and honest Step 1 notice upon clicking `Send`.
-* **Functional Interactions**:
-  * `+ New Request` button and tab strip `+` button dynamically create tabs with unique IDs (`tab_1`, `tab_2`, etc.).
-  * Keyboard shortcut `Ctrl+N` / `Cmd+N` creates a new request tab.
-  * Method and URL inputs are bound independently to each active tab.
-  * Tab close buttons gracefully handle removing tabs while maintaining at least one active tab.
-  * Navigation items provide informative toasts explaining when features will be activated instead of remaining dead controls.
-* **Automated Test Suite**:
-  * 16 unit and contract tests running natively on Node.js built-in test runner (`node --test`).
+### A. Main-Process HTTP Engine (`src/main/http/httpClient.js`)
+* **Real Network Dispatch**: Requests execute exclusively within the Node.js Electron Main Process via `fetch`, preventing the renderer from having privileged network access.
+* **All 7 HTTP Methods Supported**:
+  * `GET`: Dispatches standard GET requests without payload bodies.
+  * `POST`: Transmits payload bodies with full header and query support.
+  * `PUT`: Transmits full replacement payload bodies.
+  * `PATCH`: Transmits partial payload updates.
+  * `DELETE`: Transmits DELETE requests, gracefully handling `204 No Content`.
+  * `HEAD`: Retrieves response headers without buffering or expecting a response body.
+  * `OPTIONS`: Dispatches OPTIONS and receives allowed server methods (`Allow`).
+* **Enforced Body Rules**:
+  * Request bodies for `GET` and `HEAD` are strictly rejected by validation and disabled in the UI.
+  * Request bodies for `POST`, `PUT`, `PATCH`, and `DELETE` are fully supported.
+* **Stream-Bounded Response Buffering**:
+  * Enforces a configurable 5 MiB (`5 * 1024 * 1024` bytes) response body ceiling while reading the response stream.
+  * Automatically cancels stream reading upon exceeding the limit, setting `truncated: true` and notifying the user.
+* **Configurable Timeout & Cancellation**:
+  * Default 15,000 ms timeout per request using `AbortController`.
+  * Manual in-flight cancellation via `cancelHttpRequest(requestId)` and `window.apiForge.cancelRequest(requestId)`.
+* **Security & Header Sanitization**:
+  * Rejects CRLF injection (`\r` or `\n`) in header names and values.
+  * Validates URL schemes (strictly `http:` and `https:`).
+  * Rejects embedded credentials in URLs (`user:pass@host`).
+  * Masks sensitive headers (`Authorization`, `Cookie`) from diagnostic logs.
+
+### B. Interactive Request Builder
+* **Method Selector**: Color-coded dropdown supporting all 7 methods.
+* **URL Editor**: Real-time address bar with inline URL copying and two-way synchronization with the query parameters table.
+* **Editable Query Parameters Table**:
+  * Add, edit, toggle (send/ignore), and delete query parameters.
+  * Preserves existing base URL parameters and properly encodes spaces, ampersands, and Unicode characters without double-encoding.
+* **Editable Request Headers Table**:
+  * Add, edit, toggle, and delete request headers.
+  * Quick preset buttons: `+ JSON` (`Content-Type: application/json`) and `+ Auth` (`Authorization: Bearer <token>`).
+* **JSON Request Body Editor**:
+  * Monospace textarea with syntax validation.
+  * Status badge: `Valid JSON`, `Invalid JSON`, or `Empty`.
+  * Action controls: **Format JSON** (indents valid JSON), **Validate JSON**, **Copy Body**, and **Clear**.
+  * Shows an explicit warning and disables editing when `GET` or `HEAD` is selected.
+
+### C. Response Viewer & Metrics
+* **Status Badges**:
+  * Numeric status and status text (e.g. `200 OK`, `201 Created`, `204 No Content`, `404 Not Found`, `500 Internal Server Error`).
+  * Visually distinct color categories: 2xx (green), 3xx (cyan), 4xx (amber), 5xx (red), and network error (dark red).
+* **Metrics**: Accurate measured request duration (in milliseconds via monotonic `performance.now()`) and response size (in formatted bytes/KB).
+* **View Modes**:
+  * **Pretty**: Formatted, indented JSON view for JSON responses, or safe decoded text for HTML/plain text.
+  * **Raw**: Unformatted exact decoded response string with horizontal scroll support.
+* **Response Headers Tab**: Key/value table displaying all received response headers with individual copy controls and "Copy All Headers".
+* **Explain Tab**: Contextual guide explaining the HTTP status code and how Spring Boot `@RestController`, validation errors, and `@ExceptionHandler` map to it.
+* **Categorized Network Error Display**:
+  * Distinguishes HTTP 4xx/5xx responses from network failures.
+  * Categorizes errors into `CONNECTION_REFUSED`, `TIMEOUT`, `DNS_ERROR`, `TLS_ERROR`, `CONNECTION_ERROR`, `INVALID_REQUEST`, and `CANCELLED`.
+  * Displays friendly troubleshooting hints (e.g. verifying Spring Boot port, loopback firewall).
 
 ---
 
 ## 3. Features Intentionally Deferred to Later Steps
 
-To maintain strict architectural boundaries, the following capabilities are not part of Step 1:
-- Real HTTP network request execution (Step 2).
-- URL query parameter parsing and header manipulation engines (Step 2).
-- Local JSON collections and request history persistence (Step 2 & Step 3).
-- Environment variable substitution (`{{baseUrl}}`) and JWT token handling (Step 3).
-- Spring Boot OpenAPI import from `/v3/api-docs` (Step 4).
-- Plain-language Spring exception explanations and role testing (Step 5).
+* Collections and folders management (Step 3).
+* Request history storage (Step 3).
+* Environment variables and `{{baseUrl}}` token substitution (Step 4).
+* JWT token lifecycle and automatic header injection (Step 4).
+* Spring Boot OpenAPI import (`/v3/api-docs`) (Step 5).
+* Automated response test assertions (Step 6).
+* Plain-language Spring exception explanation engine (Step 7).
 
 ---
 
@@ -59,88 +88,80 @@ To maintain strict architectural boundaries, the following capabilities are not 
 
 ```text
 API_Forge/
-├── package.json
-├── package-lock.json
-├── .gitignore
-├── README.md
+├── package.json                          # Pinned dependencies & scripts
+├── package-lock.json                     # Deterministic dependency lock
+├── .gitignore                            # Standard Node/Electron gitignore
+├── .npmrc                                # Configures Windows script-shell
+├── README.md                             # Architectural and usage documentation
 ├── src/
 │   ├── main/
-│   │   ├── main.js                 # Electron main process & window lifecycle
+│   │   ├── main.js                       # Electron window lifecycle & navigation lockdown
+│   │   ├── http/
+│   │   │   └── httpClient.js             # Core HTTP engine, validation, streaming, & cancellation
 │   │   ├── ipc/
-│   │   │   └── appHandlers.js      # Main IPC handlers with strict argument validation
+│   │   │   └── appHandlers.js            # Main IPC handlers (get-info, send-request, cancel, copy)
 │   │   └── security/
-│   │       └── navigation.js       # Navigation, popup, and permission security rules
+│   │       └── navigation.js             # Navigation guards, popup denial, permission restriction
 │   ├── preload/
-│   │   └── preload.js              # Hardened contextBridge contract
+│   │   └── preload.js                    # Frozen contextBridge API (window.apiForge)
 │   └── renderer/
-│       ├── index.html              # Desktop workspace layout with CSP
+│       ├── index.html                    # Desktop workspace layout with strict CSP
 │       ├── styles/
-│       │   └── main.css            # Dark graphite theme and responsive design
+│       │   └── main.css                  # Dark design system, method badges, tables, & viewer
 │       └── scripts/
-│           └── renderer.js         # Reactive UI, tabs state, and bridge consumer
+│           └── renderer.js               # Reactive multi-tab manager, request builder, & viewer
 └── tests/
-    └── foundation.test.js          # Automated test suite (16 tests, 6 suites)
+    ├── foundation.test.js                # Foundation & security test suite (16 tests)
+    ├── http.test.js                      # HTTP engine & local mock server integration suite (30 tests)
+    └── smoke.js                          # End-to-end Electron runtime & UI interaction smoke test
 ```
 
 ---
 
-## 5. Security Architecture & Decisions
+## 5. Security Boundaries & Architecture
 
-1. **Context Isolation**: Renderer execution operates in an isolated world (`contextIsolation: true`). The DOM cannot access the preload script's prototype context.
-2. **Node Integration**: Disabled entirely in the renderer (`nodeIntegration: false`). No `require`, `Buffer`, or Node built-ins exist in `window`.
-3. **Renderer Sandboxing**: `sandbox: true` forces Chromium's sandboxing mechanisms on the renderer process.
-4. **Content Security Policy**: `default-src 'self'` prevents loading unauthorized external scripts, images, or frames. `connect-src 'none'` prevents out-of-band network exfiltration from the renderer in Step 1.
-5. **Safe IPC Bridge**: Only `window.apiForge.getAppInfo()` is exposed via `contextBridge.exposeInMainWorld()`. The API object is frozen with `Object.freeze()`.
-6. **IPC Payload Validation**: Incoming arguments are validated for data type, payload size (maximum 1024 bytes), unknown keys, and prototype tampering before processing.
-7. **Navigation Shield**:
-   - `setWindowOpenHandler` denies all unexpected popups (`{ action: 'deny' }`).
-   - `will-navigate` blocks navigation away from the local `index.html`.
-   - `will-attach-webview` denies unauthorized `<webview>` elements.
-   - `setPermissionRequestHandler` blocks all hardware permission requests.
+1. **Context Isolation & Sandboxing**: `contextIsolation: true`, `nodeIntegration: false`, and `sandbox: true` are strictly enforced on the BrowserWindow.
+2. **Main-Process Network Execution**: The renderer process has no direct network capability (`connect-src 'none'`). All HTTP requests are validated and dispatched by the Electron Main Process.
+3. **Restricted Preload Contract**: `window.apiForge` exposes only four explicit methods: `getAppInfo()`, `sendRequest()`, `cancelRequest()`, and `copyToClipboard()`. The bridge object is frozen with `Object.freeze()`.
+4. **Header Injection Defense**: Header names are validated against RFC 7230 tokens, and CRLF (`\r`, `\n`) characters in header names or values are rejected.
+5. **Safe Response Rendering**: Response bodies are rendered strictly via safe DOM text nodes (`textContent`). No server-supplied HTML or JavaScript is ever evaluated or injected into the DOM.
+6. **TLS Verification**: Certificate verification remains strictly enabled by default.
 
 ---
 
-## 6. Prerequisites
+## 6. How to Run and Test
 
-* **Node.js**: v20.x or v22.x (Recommended: Node.js v22.16+)
-* **npm**: v10.x or later
-* **Operating System**: Windows 10/11 (or macOS / Linux)
-
----
-
-## 7. Installation & Verification Commands
-
-All commands should be executed from the project root:
-
-`C:\Users\thiru\OneDrive\Desktop\API_Forge`
+From the project root: `C:\Users\thiru\OneDrive\Desktop\API_Forge`
 
 ### Install Dependencies
-```bash
+```powershell
 npm install
 ```
 
-### Run Automated Tests
-```bash
+### Run Automated Unit & Integration Tests (46 Tests)
+```powershell
 npm test
 ```
-*Expected result: 16 passing tests across 6 test suites.*
+*Executes all 46 tests across 10 test suites using Node.js built-in test runner, including full mock server integration testing for all 7 HTTP methods, timeouts, 404/500 responses, and cancellation.*
 
-### Launch Application (Development / Desktop Window)
-```bash
+### Run End-to-End Electron Smoke Test
+```powershell
+npm run test:smoke
+```
+*Launches Electron in an automated test harness to verify UI rendering, request sending, response viewer DOM updates, and clipboard copy operations.*
+
+### Launch Desktop Application
+```powershell
 npm start
 ```
 *or:*
-```bash
+```powershell
 npm run dev
 ```
 
 ---
 
-## 8. Troubleshooting
+## 7. Known Limitations (Step 2 Scope)
 
-* **ComSpec in Minimal Windows Shells**: If `npm install` reports `ERR_INVALID_ARG_TYPE: The "file" argument must be of type string. Received undefined` during the Electron postinstall script, ensure the `ComSpec` environment variable is available:
-  ```powershell
-  $env:ComSpec = "$env:SystemRoot\system32\cmd.exe"
-  npm install
-  ```
-* **OneDrive File Syncing**: When running on OneDrive-backed Desktop paths, ensure OneDrive is not actively locking files during extraction. If an `EPERM` error occurs, pause OneDrive syncing temporarily or re-run `npm install`.
+* In Step 2, request configurations are session-bound across open tabs; local persistence to disk (collections and history) is scheduled for Step 3.
+* Environment variable substitution (e.g. `{{baseUrl}}`) is deferred to Step 4.

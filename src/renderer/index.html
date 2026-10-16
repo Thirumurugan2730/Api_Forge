@@ -42,26 +42,26 @@
         <div class="nav-section-title">WORKSPACE</div>
         <ul class="nav-list">
           <li class="nav-item">
-            <button class="nav-btn" data-feature="Collections" data-step="Step 2" id="nav-collections">
+            <button class="nav-btn" data-feature="Collections" data-step="Step 3" id="nav-collections">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
               </svg>
               <span>Collections</span>
-              <span class="tag-deferred">Step 2</span>
+              <span class="tag-deferred">Step 3</span>
             </button>
           </li>
           <li class="nav-item">
-            <button class="nav-btn" data-feature="History" data-step="Step 2" id="nav-history">
+            <button class="nav-btn" data-feature="History" data-step="Step 3" id="nav-history">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <circle cx="12" cy="12" r="10"></circle>
                 <polyline points="12 6 12 12 16 14"></polyline>
               </svg>
               <span>History</span>
-              <span class="tag-deferred">Step 2</span>
+              <span class="tag-deferred">Step 3</span>
             </button>
           </li>
           <li class="nav-item">
-            <button class="nav-btn" data-feature="Environments" data-step="Step 3" id="nav-environments">
+            <button class="nav-btn" data-feature="Environments" data-step="Step 4" id="nav-environments">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <rect x="2" y="2" width="20" height="8" rx="2" ry="2"></rect>
                 <rect x="2" y="14" width="20" height="8" rx="2" ry="2"></rect>
@@ -69,7 +69,7 @@
                 <line x1="6" y1="18" x2="6.01" y2="18"></line>
               </svg>
               <span>Environments</span>
-              <span class="tag-deferred">Step 3</span>
+              <span class="tag-deferred">Step 4</span>
             </button>
           </li>
         </ul>
@@ -77,13 +77,13 @@
 
       <div class="sidebar-footer">
         <div class="settings-item">
-          <button class="nav-btn" data-feature="Settings" data-step="Step 4" id="nav-settings">
+          <button class="nav-btn" data-feature="Settings" data-step="Step 5" id="nav-settings">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <circle cx="12" cy="12" r="3"></circle>
               <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
             </svg>
             <span>Settings</span>
-            <span class="tag-deferred">Step 4</span>
+            <span class="tag-deferred">Step 5</span>
           </button>
         </div>
 
@@ -93,8 +93,8 @@
             <span id="label-app-version" class="runtime-value">v0.1.0</span>
           </div>
           <div class="runtime-line">
-            <span class="runtime-label">Bridge:</span>
-            <span id="bridge-status-pill" class="badge-status checking">Checking...</span>
+            <span class="runtime-label">Engine:</span>
+            <span id="bridge-status-pill" class="badge-status checking">HTTP Ready</span>
           </div>
         </div>
       </div>
@@ -113,7 +113,7 @@
         </div>
 
         <div class="toolbar-center">
-          <div class="env-selector" title="Active Environment (Configured in Step 3)">
+          <div class="env-selector" title="Active Environment (Configured in Step 4)">
             <span class="env-dot"></span>
             <span class="env-name">No Environment</span>
           </div>
@@ -122,7 +122,7 @@
         <div class="toolbar-right">
           <div id="main-status-indicator" class="main-status-chip online" title="Status of the Electron Main Process Bridge">
             <span class="status-indicator-dot"></span>
-            <span id="status-indicator-text">Bridge: Connecting...</span>
+            <span id="status-indicator-text">HTTP Engine: Active</span>
           </div>
         </div>
       </header>
@@ -170,15 +170,28 @@
               spellcheck="false"
               autocomplete="off"
             >
+            <button id="btn-copy-url" class="btn-inline-copy" title="Copy Effective URL" aria-label="Copy URL">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+              </svg>
+            </button>
           </div>
 
           <div class="action-buttons-wrapper">
-            <button id="btn-send" class="btn btn-send" title="Send Request (Step 2 activation)">
+            <button id="btn-send" class="btn btn-send" title="Execute HTTP Request (Ctrl+Enter)">
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                 <line x1="22" y1="2" x2="11" y2="13"></line>
                 <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
               </svg>
-              <span>Send</span>
+              <span id="btn-send-label">Send</span>
+            </button>
+
+            <button id="btn-cancel" class="btn btn-cancel" title="Cancel in-flight request" hidden>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+                <rect x="4" y="4" width="16" height="16" rx="2"></rect>
+              </svg>
+              <span>Cancel</span>
             </button>
           </div>
         </div>
@@ -188,14 +201,15 @@
           <div class="subtabs-header" role="tablist">
             <button class="subtab-btn active" data-subtab="params" role="tab" aria-selected="true" id="tab-params">
               <span>Params</span>
-              <span class="subtab-counter">0</span>
+              <span class="subtab-counter" id="params-badge-count">0</span>
             </button>
             <button class="subtab-btn" data-subtab="headers" role="tab" aria-selected="false" id="tab-headers">
               <span>Headers</span>
-              <span class="subtab-counter">0</span>
+              <span class="subtab-counter" id="headers-badge-count">0</span>
             </button>
             <button class="subtab-btn" data-subtab="body" role="tab" aria-selected="false" id="tab-body">
               <span>Body</span>
+              <span class="subtab-dot" id="body-active-dot" hidden></span>
             </button>
             <button class="subtab-btn" data-subtab="tests" role="tab" aria-selected="false" id="tab-tests">
               <span>Tests</span>
@@ -203,42 +217,120 @@
           </div>
 
           <div class="subtab-content-panel">
+            <!-- Params Tab Panel -->
             <div id="panel-params" class="subtab-panel active" role="tabpanel">
-              <div class="future-notice">
-                <div class="future-notice-icon">⚙️</div>
-                <div class="future-notice-text">
-                  <h4>Query Parameters</h4>
-                  <p>Key-value parameter parsing and URL query string synchronization will be activated in <strong>Step 2</strong>. In Step 1, you can edit and prepare your full URL directly in the address bar above.</p>
-                </div>
+              <div class="table-toolbar">
+                <span class="table-title">Query Parameters</span>
+                <button id="btn-add-param" class="btn btn-secondary btn-xs">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                    <line x1="12" y1="5" x2="12" y2="19"></line>
+                    <line x1="5" y1="12" x2="19" y2="12"></line>
+                  </svg>
+                  <span>Add Parameter</span>
+                </button>
+              </div>
+
+              <div class="keyvalue-table-container">
+                <table class="keyvalue-table" id="params-table">
+                  <thead>
+                    <tr>
+                      <th class="col-check" title="Toggle parameter">Send</th>
+                      <th class="col-key">Key</th>
+                      <th class="col-val">Value</th>
+                      <th class="col-act">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody id="params-tbody">
+                    <!-- Dynamic Rows Injected -->
+                  </tbody>
+                </table>
+                <div id="params-empty-hint" class="table-empty-hint">No query parameters. Click <strong>Add Parameter</strong> or edit the URL query string.</div>
               </div>
             </div>
 
+            <!-- Headers Tab Panel -->
             <div id="panel-headers" class="subtab-panel" role="tabpanel" hidden>
-              <div class="future-notice">
-                <div class="future-notice-icon">📋</div>
-                <div class="future-notice-text">
-                  <h4>Request Headers</h4>
-                  <p>Custom HTTP headers (Content-Type, Authorization, Accept, custom headers) will be managed in <strong>Step 2</strong>.</p>
+              <div class="table-toolbar">
+                <span class="table-title">Request Headers</span>
+                <div class="table-toolbar-actions">
+                  <button id="btn-preset-json" class="btn btn-secondary btn-xs" title="Add Content-Type: application/json">+ JSON</button>
+                  <button id="btn-preset-auth" class="btn btn-secondary btn-xs" title="Add Authorization header">+ Auth</button>
+                  <button id="btn-add-header" class="btn btn-secondary btn-xs">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                      <line x1="12" y1="5" x2="12" y2="19"></line>
+                      <line x1="5" y1="12" x2="19" y2="12"></line>
+                    </svg>
+                    <span>Add Header</span>
+                  </button>
                 </div>
+              </div>
+
+              <div class="keyvalue-table-container">
+                <table class="keyvalue-table" id="headers-table">
+                  <thead>
+                    <tr>
+                      <th class="col-check" title="Toggle header">Send</th>
+                      <th class="col-key">Header</th>
+                      <th class="col-val">Value</th>
+                      <th class="col-act">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody id="headers-tbody">
+                    <!-- Dynamic Rows Injected -->
+                  </tbody>
+                </table>
+                <div id="headers-empty-hint" class="table-empty-hint">No custom headers configured. Click <strong>Add Header</strong> to customize headers.</div>
               </div>
             </div>
 
+            <!-- Body Tab Panel -->
             <div id="panel-body" class="subtab-panel" role="tabpanel" hidden>
-              <div class="future-notice">
-                <div class="future-notice-icon">📦</div>
-                <div class="future-notice-text">
-                  <h4>Request Body</h4>
-                  <p>JSON payloads, form data, and raw request bodies will be enabled alongside the HTTP execution engine in <strong>Step 2</strong>.</p>
+              <!-- Notice when method is GET or HEAD -->
+              <div id="body-disabled-notice" class="method-body-warning" hidden>
+                <div class="warning-icon">⚠️</div>
+                <div class="warning-text">
+                  <strong>Body disabled for <span id="warning-method-label">GET</span> requests.</strong>
+                  HTTP specifications state that GET and HEAD requests should not contain a request body. To send payload data, select <strong>POST, PUT, PATCH,</strong> or <strong>DELETE</strong>.
+                </div>
+              </div>
+
+              <div id="body-editor-wrapper" class="body-editor-wrapper">
+                <div class="body-toolbar">
+                  <div class="body-toolbar-left">
+                    <span class="body-type-label">JSON (application/json)</span>
+                    <span id="json-validation-badge" class="badge-validation empty">Empty</span>
+                  </div>
+                  <div class="body-toolbar-right">
+                    <button id="btn-format-json" class="btn btn-secondary btn-xs" title="Format JSON with indentation">Format JSON</button>
+                    <button id="btn-validate-json" class="btn btn-secondary btn-xs" title="Validate JSON syntax">Validate JSON</button>
+                    <button id="btn-copy-body" class="btn btn-secondary btn-xs" title="Copy Request Body">Copy Body</button>
+                    <button id="btn-clear-body" class="btn btn-secondary btn-xs" title="Clear request body">Clear</button>
+                  </div>
+                </div>
+
+                <div class="json-editor-container">
+                  <textarea
+                    id="input-body-text"
+                    class="json-textarea"
+                    placeholder="{\n  &quot;name&quot;: &quot;Spring Boot API&quot;,\n  &quot;status&quot;: &quot;active&quot;\n}"
+                    spellcheck="false"
+                  ></textarea>
+                </div>
+
+                <div id="body-error-box" class="json-error-banner" hidden>
+                  <span class="error-icon">✕</span>
+                  <span id="body-error-msg" class="error-msg">Syntax Error</span>
                 </div>
               </div>
             </div>
 
+            <!-- Tests Tab Panel -->
             <div id="panel-tests" class="subtab-panel" role="tabpanel" hidden>
               <div class="future-notice">
                 <div class="future-notice-icon">🧪</div>
                 <div class="future-notice-text">
-                  <h4>Automated Tests</h4>
-                  <p>Spring Boot response assertions, status code validations, and JSON schema tests will be implemented in later steps.</p>
+                  <h4>Response Assertions & Tests</h4>
+                  <p>Automated response validations (HTTP status checks, JSON path assertions, Spring Boot actuator tests) will be implemented in later steps.</p>
                 </div>
               </div>
             </div>
@@ -250,8 +342,13 @@
       <section class="response-workspace" aria-label="Response Workspace">
         <div class="response-header">
           <div class="response-tabs" role="tablist">
-            <button class="resp-tab-btn active" data-resptab="body" role="tab" aria-selected="true" id="resptab-body">Body</button>
-            <button class="resp-tab-btn" data-resptab="headers" role="tab" aria-selected="false" id="resptab-headers">Headers</button>
+            <button class="resp-tab-btn active" data-resptab="body" role="tab" aria-selected="true" id="resptab-body">
+              <span>Body</span>
+            </button>
+            <button class="resp-tab-btn" data-resptab="headers" role="tab" aria-selected="false" id="resptab-headers">
+              <span>Headers</span>
+              <span id="resp-headers-count-badge" class="subtab-counter" hidden>0</span>
+            </button>
             <button class="resp-tab-btn" data-resptab="explain" role="tab" aria-selected="false" id="resptab-explain">
               <span>Explain</span>
               <span class="spring-tag">Spring</span>
@@ -259,14 +356,23 @@
           </div>
 
           <div class="response-meta-stats">
-            <span class="stat-item" id="stat-status">Status: <span class="stat-val empty">—</span></span>
-            <span class="stat-item" id="stat-time">Time: <span class="stat-val empty">—</span></span>
-            <span class="stat-item" id="stat-size">Size: <span class="stat-val empty">—</span></span>
+            <span class="stat-item" id="stat-status-wrapper">
+              <span class="stat-label">Status:</span>
+              <span id="stat-status" class="stat-val empty">—</span>
+            </span>
+            <span class="stat-item">
+              <span class="stat-label">Time:</span>
+              <span id="stat-time" class="stat-val empty">—</span>
+            </span>
+            <span class="stat-item">
+              <span class="stat-label">Size:</span>
+              <span id="stat-size" class="stat-val empty">—</span>
+            </span>
           </div>
         </div>
 
         <div class="response-body-wrapper">
-          <!-- Empty State View -->
+          <!-- 1. Empty State View -->
           <div id="response-empty-state" class="response-empty-state">
             <div class="empty-state-graphic">
               <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
@@ -278,24 +384,114 @@
             <h3 class="empty-state-title">No response yet</h3>
             <p class="empty-state-desc">Configure a request and send it to see the response.</p>
             <div class="empty-state-hint">
-              <span class="hint-pill">HTTP Engine: Step 2</span>
+              <span class="hint-pill">HTTP Engine Ready (GET, POST, PUT, PATCH, DELETE, HEAD, OPTIONS)</span>
             </div>
           </div>
 
-          <!-- Step 1 Notice when Send is triggered -->
-          <div id="response-step1-feedback" class="response-feedback-box" hidden>
-            <div class="feedback-card">
-              <div class="feedback-badge">Step 1 Scope Notice</div>
-              <h4>HTTP Engine Scheduled for Step 2</h4>
-              <p>You triggered the Send action with:</p>
-              <div class="preview-request-meta">
-                <span id="preview-method-badge" class="badge-method GET">GET</span>
-                <code id="preview-url-text" class="preview-url">No URL entered</code>
+          <!-- 2. Loading State View -->
+          <div id="response-loading-state" class="response-loading-state" hidden>
+            <div class="spinner-large"></div>
+            <h3 class="loading-title">Sending Request...</h3>
+            <p id="loading-target-url" class="loading-url">Connecting to server</p>
+            <button id="btn-cancel-loading" class="btn btn-secondary btn-sm">Cancel Request</button>
+          </div>
+
+          <!-- 3. Network Error State View -->
+          <div id="response-network-error" class="response-feedback-box" hidden>
+            <div class="feedback-card error-card">
+              <div class="error-card-header">
+                <span id="error-type-badge" class="badge-error-type">CONNECTION_REFUSED</span>
+                <span class="error-timestamp" id="error-timestamp">Just now</span>
               </div>
-              <p class="feedback-detail">
-                As designed for Step 1, the network execution engine has not been connected to avoid faking simulated responses or premature API calls. Real HTTP dispatching for all 7 HTTP methods will be activated in <strong>Step 2</strong>.
+              <h4 id="error-title-text">Could not connect to the server</h4>
+              <p id="error-details-text" class="feedback-detail">
+                Connection was refused. Ensure that your target server (e.g. Spring Boot application) is running and listening.
               </p>
-              <button id="btn-dismiss-feedback" class="btn btn-secondary btn-sm">Return to Empty State</button>
+              <div class="error-troubleshooting">
+                <span class="ts-title">Troubleshooting hints:</span>
+                <ul id="error-hints-list">
+                  <li>Verify that your local backend is running (e.g. <code>mvn spring-boot:run</code>).</li>
+                  <li>Check that the port number matches your application configuration.</li>
+                  <li>Confirm that firewall or antivirus software is not blocking local loopback connections.</li>
+                </ul>
+              </div>
+              <button id="btn-dismiss-error" class="btn btn-secondary btn-sm">Dismiss</button>
+            </div>
+          </div>
+
+          <!-- 4. HTTP Response Content View (Active on Response Received) -->
+          <div id="response-content-view" class="response-content-view" hidden>
+            <!-- Body Subtab Panel -->
+            <div id="resp-panel-body" class="resp-subpanel active">
+              <div class="resp-viewer-toolbar">
+                <div class="view-mode-toggles">
+                  <button id="btn-mode-pretty" class="btn-submode active" title="Formatted and indented view">Pretty</button>
+                  <button id="btn-mode-raw" class="btn-submode" title="Raw unformatted text">Raw</button>
+                </div>
+                <div class="resp-viewer-actions">
+                  <span id="truncation-warning-tag" class="tag-truncated" hidden>Truncated (5 MiB limit)</span>
+                  <button id="btn-copy-response" class="btn btn-secondary btn-xs" title="Copy response body to clipboard">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                    </svg>
+                    <span>Copy Body</span>
+                  </button>
+                </div>
+              </div>
+
+              <!-- Body Preformatted Container -->
+              <div class="response-viewer-code-container">
+                <div id="response-empty-body-notice" class="empty-body-notice" hidden>
+                  <span class="empty-body-icon">ℹ️</span>
+                  <span>Empty response body (HTTP <span id="empty-body-status">204 No Content</span>)</span>
+                </div>
+                <pre id="response-body-pre" class="response-body-pre" tabindex="0"></pre>
+              </div>
+            </div>
+
+            <!-- Headers Subtab Panel -->
+            <div id="resp-panel-headers" class="resp-subpanel" hidden>
+              <div class="resp-viewer-toolbar">
+                <span class="table-title">Received Response Headers</span>
+                <button id="btn-copy-all-headers" class="btn btn-secondary btn-xs" title="Copy all headers as text">Copy All Headers</button>
+              </div>
+
+              <div class="keyvalue-table-container">
+                <table class="keyvalue-table" id="response-headers-table">
+                  <thead>
+                    <tr>
+                      <th class="col-key">Header</th>
+                      <th class="col-val">Value</th>
+                      <th class="col-act">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody id="response-headers-tbody">
+                    <!-- Injected -->
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- Explain Subtab Panel -->
+            <div id="resp-panel-explain" class="resp-subpanel" hidden>
+              <div class="explain-container">
+                <div class="explain-card">
+                  <div class="explain-badge">Spring Boot Developer Guide</div>
+                  <h4 id="explain-status-title">HTTP 200 OK</h4>
+                  <p id="explain-status-desc" class="explain-desc">The request has succeeded. In Spring Boot, this is typically returned by @GetMapping methods returning an entity or ResponseEntity.ok().</p>
+                  <div class="explain-meta-box">
+                    <div class="explain-meta-item">
+                      <span class="meta-item-title">Effective URL:</span>
+                      <code id="explain-url-val" class="code-pill">http://localhost:8080</code>
+                    </div>
+                    <div class="explain-meta-item">
+                      <span class="meta-item-title">Content-Type:</span>
+                      <code id="explain-content-type" class="code-pill">application/json</code>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
