@@ -1,6 +1,6 @@
 /**
  * ApiForge Lite — Spring Edition
- * Renderer Process Controller (Step 2: Real HTTP Engine & Response Viewer)
+ * Renderer Process Controller (Step 3: Collections, Folders, and Request Management)
  */
 
 (function () {
@@ -11,7 +11,11 @@
     tabs: [],
     activeTabId: null,
     tabCounter: 0,
-    appInfo: null
+    appInfo: null,
+    collectionsTree: [],
+    expandedNodes: new Set(),
+    activeModal: null,
+    pendingModalAction: null
   };
 
   // DOM Elements Cache
@@ -34,16 +38,19 @@
     paramsBadgeCount: document.getElementById('params-badge-count'),
     headersBadgeCount: document.getElementById('headers-badge-count'),
     bodyActiveDot: document.getElementById('body-active-dot'),
+
     // Params Table
     btnAddParam: document.getElementById('btn-add-param'),
     paramsTbody: document.getElementById('params-tbody'),
     paramsEmptyHint: document.getElementById('params-empty-hint'),
+
     // Headers Table
     btnAddHeader: document.getElementById('btn-add-header'),
     btnPresetJson: document.getElementById('btn-preset-json'),
     btnPresetAuth: document.getElementById('btn-preset-auth'),
     headersTbody: document.getElementById('headers-tbody'),
     headersEmptyHint: document.getElementById('headers-empty-hint'),
+
     // Body Editor
     bodyDisabledNotice: document.getElementById('body-disabled-notice'),
     warningMethodLabel: document.getElementById('warning-method-label'),
@@ -56,6 +63,7 @@
     inputBodyText: document.getElementById('input-body-text'),
     bodyErrorBox: document.getElementById('body-error-box'),
     bodyErrorMsg: document.getElementById('body-error-msg'),
+
     // Response Section
     respTabButtons: document.querySelectorAll('.resp-tab-btn'),
     respHeadersCountBadge: document.getElementById('resp-headers-count-badge'),
@@ -90,7 +98,60 @@
     explainUrlVal: document.getElementById('explain-url-val'),
     explainContentType: document.getElementById('explain-content-type'),
     toastContainer: document.getElementById('toast-container'),
-    navButtons: document.querySelectorAll('.nav-btn[data-feature]')
+    navButtons: document.querySelectorAll('.nav-btn[data-feature]'),
+
+    // Step 3: Collections Sidebar & Save Controls
+    btnCreateCollection: document.getElementById('btn-create-collection'),
+    collectionsTreeView: document.getElementById('collections-tree-view'),
+    crumbActiveCollection: document.getElementById('crumb-active-collection'),
+    btnSaveRequest: document.getElementById('btn-save-request'),
+    saveIndicatorDot: document.getElementById('save-indicator-dot'),
+    btnSaveAsRequest: document.getElementById('btn-save-as-request'),
+
+    // Step 3: Modals
+    modalBackdrop: document.getElementById('modal-backdrop'),
+
+    // Save Modal
+    modalSaveRequest: document.getElementById('modal-save-request'),
+    modalSaveTitle: document.getElementById('modal-save-title'),
+    btnCloseSaveModal: document.getElementById('btn-close-save-modal'),
+    saveRequestName: document.getElementById('save-request-name'),
+    saveTargetCollection: document.getElementById('save-target-collection'),
+    saveTargetFolder: document.getElementById('save-target-folder'),
+    btnCancelSaveModal: document.getElementById('btn-cancel-save-modal'),
+    btnConfirmSaveModal: document.getElementById('btn-confirm-save-modal'),
+
+    // Collection Modal
+    modalCollection: document.getElementById('modal-collection'),
+    modalColTitle: document.getElementById('modal-col-title'),
+    btnCloseColModal: document.getElementById('btn-close-col-modal'),
+    collectionNameInput: document.getElementById('collection-name-input'),
+    btnCancelColModal: document.getElementById('btn-cancel-col-modal'),
+    btnConfirmColModal: document.getElementById('btn-confirm-col-modal'),
+
+    // Folder Modal
+    modalFolder: document.getElementById('modal-folder'),
+    modalFldTitle: document.getElementById('modal-fld-title'),
+    btnCloseFldModal: document.getElementById('btn-close-fld-modal'),
+    folderNameInput: document.getElementById('folder-name-input'),
+    btnCancelFldModal: document.getElementById('btn-cancel-fld-modal'),
+    btnConfirmFldModal: document.getElementById('btn-confirm-fld-modal'),
+
+    // Rename Request Modal
+    modalRenameRequest: document.getElementById('modal-rename-request'),
+    modalRenameReqTitle: document.getElementById('modal-rename-req-title'),
+    btnCloseRenameReqModal: document.getElementById('btn-close-rename-req-modal'),
+    renameRequestInput: document.getElementById('rename-request-input'),
+    btnCancelRenameReqModal: document.getElementById('btn-cancel-rename-req-modal'),
+    btnConfirmRenameReqModal: document.getElementById('btn-confirm-rename-req-modal'),
+
+    // Delete Confirm Modal
+    modalDelete: document.getElementById('modal-delete'),
+    modalDelTitle: document.getElementById('modal-del-title'),
+    btnCloseDelModal: document.getElementById('btn-close-del-modal'),
+    deleteConfirmMessage: document.getElementById('delete-confirm-message'),
+    btnCancelDelModal: document.getElementById('btn-cancel-del-modal'),
+    btnConfirmDelModal: document.getElementById('btn-confirm-del-modal')
   };
 
   // Helper: Format byte counts cleanly
@@ -141,6 +202,67 @@
   }
 
   // ==========================================================================
+  // Snapshot & Unsaved Indicator Helpers
+  // ==========================================================================
+
+  function getRequestSnapshot(tab) {
+    if (!tab) return '';
+    return JSON.stringify({
+      method: tab.method,
+      url: tab.url,
+      params: (tab.params || []).map((p) => ({ key: p.key, value: p.value, enabled: p.enabled })),
+      headers: (tab.headers || []).map((h) => ({ key: h.key, value: h.value, enabled: h.enabled })),
+      body: tab.body || ''
+    });
+  }
+
+  function isTabDirty(tab) {
+    if (!tab) return false;
+    const current = getRequestSnapshot(tab);
+    if (tab.savedSnapshot !== undefined && tab.savedSnapshot !== null) {
+      return current !== tab.savedSnapshot;
+    }
+    // If not yet saved to a collection, dirty if non-empty
+    return !!(
+      tab.url ||
+      tab.body ||
+      (tab.params && tab.params.some((p) => p.key || p.value)) ||
+      (tab.headers && tab.headers.some((h) => h.key || h.value)) ||
+      tab.method !== 'GET'
+    );
+  }
+
+  function updateUnsavedIndicator() {
+    const tab = getActiveTab();
+    if (!tab) return;
+    const dirty = isTabDirty(tab);
+
+    if (elements.saveIndicatorDot) {
+      elements.saveIndicatorDot.hidden = !dirty;
+    }
+
+    renderTabStrip();
+    updateBreadcrumb();
+  }
+
+  function updateBreadcrumb() {
+    if (!elements.crumbActiveCollection) return;
+    const tab = getActiveTab();
+    if (!tab) {
+      elements.crumbActiveCollection.textContent = 'ApiForge Lite';
+      return;
+    }
+
+    if (tab.savedMeta && tab.savedMeta.collectionId) {
+      const col = state.collectionsTree.find((c) => c.id === tab.savedMeta.collectionId);
+      const colName = col ? col.name : 'Collection';
+      elements.crumbActiveCollection.textContent = `${colName} / ${tab.savedMeta.savedName || tab.title}`;
+    } else {
+      elements.crumbActiveCollection.textContent = tab.url ? 'Unsaved Request' : 'New Request';
+    }
+  }
+
+  // ==========================================================================
   // Tab Management
   // ==========================================================================
 
@@ -152,6 +274,7 @@
     const newTab = {
       id: tabId,
       title: options.title || (isFirst ? 'New Request' : `Request ${state.tabCounter}`),
+      isCustomTitle: !!options.isCustomTitle,
       method: options.method || 'GET',
       url: options.url || '',
       params: options.params || [],
@@ -163,8 +286,14 @@
       error: null,
       responseSubtab: 'body',
       bodyViewMode: 'pretty',
-      activeRequestId: null
+      activeRequestId: null,
+      savedMeta: options.savedMeta || null,
+      savedSnapshot: options.savedSnapshot !== undefined ? options.savedSnapshot : null
     };
+
+    if (options.savedMeta && newTab.savedSnapshot === null) {
+      newTab.savedSnapshot = getRequestSnapshot(newTab);
+    }
 
     state.tabs.push(newTab);
     renderTabStrip();
@@ -200,8 +329,9 @@
     // 3. Sync Response Panel
     renderResponseWorkspace();
 
-    // 4. Update Tab Strip visuals
+    // 4. Update Tab Strip & Unsaved Indicator visuals
     renderTabStrip();
+    updateUnsavedIndicator();
   }
 
   function closeTab(tabId, event) {
@@ -252,6 +382,14 @@
 
       tabElement.appendChild(methodTag);
       tabElement.appendChild(titleSpan);
+
+      // Unsaved dot in tab
+      if (isTabDirty(tab)) {
+        const dot = document.createElement('span');
+        dot.className = 'save-indicator-dot';
+        dot.setAttribute('title', 'Unsaved changes');
+        tabElement.appendChild(dot);
+      }
 
       if (state.tabs.length > 1) {
         const closeBtn = document.createElement('button');
@@ -310,10 +448,16 @@
     }
 
     updateTabTitle(tab);
+    updateUnsavedIndicator();
   }
 
   function updateTabTitle(tab) {
     if (!tab) return;
+    if (tab.isCustomTitle && tab.title) {
+      renderTabStrip();
+      return;
+    }
+
     if (tab.url.trim()) {
       try {
         const parsed = new URL(tab.url.trim());
@@ -420,6 +564,7 @@
     if (!tab) return;
     tab.params.push({ key: '', value: '', enabled: true });
     renderParamsTable();
+    updateUnsavedIndicator();
   }
 
   // ==========================================================================
@@ -456,6 +601,7 @@
       check.addEventListener('change', (e) => {
         header.enabled = e.target.checked;
         renderHeadersTable();
+        updateUnsavedIndicator();
       });
       tdCheck.appendChild(check);
 
@@ -469,6 +615,7 @@
       inputKey.value = header.key;
       inputKey.addEventListener('input', (e) => {
         header.key = e.target.value;
+        updateUnsavedIndicator();
       });
       tdKey.appendChild(inputKey);
 
@@ -482,6 +629,7 @@
       inputVal.value = header.value;
       inputVal.addEventListener('input', (e) => {
         header.value = e.target.value;
+        updateUnsavedIndicator();
       });
       tdVal.appendChild(inputVal);
 
@@ -495,6 +643,7 @@
       btnDel.addEventListener('click', () => {
         tab.headers.splice(index, 1);
         renderHeadersTable();
+        updateUnsavedIndicator();
       });
       tdAct.appendChild(btnDel);
 
@@ -511,6 +660,7 @@
     if (!tab) return;
     tab.headers.push({ key, value, enabled });
     renderHeadersTable();
+    updateUnsavedIndicator();
   }
 
   // ==========================================================================
@@ -545,29 +695,29 @@
   }
 
   function validateBodyJson(rawText) {
-    if (!elements.jsonValidationBadge || !elements.bodyErrorBox) return;
+    if (!elements.jsonValidationBadge || !elements.bodyErrorBox) return true;
 
     if (!rawText || !rawText.trim()) {
-      elements.jsonValidationBadge.textContent = 'Empty';
-      elements.jsonValidationBadge.className = 'badge-validation empty';
+      elements.jsonValidationBadge.textContent = 'JSON';
+      elements.jsonValidationBadge.className = 'badge-json';
       elements.bodyErrorBox.hidden = true;
-      return { valid: true, empty: true };
+      return true;
     }
 
     try {
-      JSON.parse(rawText.trim());
-      elements.jsonValidationBadge.textContent = 'Valid JSON';
-      elements.jsonValidationBadge.className = 'badge-validation valid';
+      JSON.parse(rawText);
+      elements.jsonValidationBadge.textContent = 'VALID JSON';
+      elements.jsonValidationBadge.className = 'badge-json valid';
       elements.bodyErrorBox.hidden = true;
-      return { valid: true, empty: false };
+      return true;
     } catch (err) {
-      elements.jsonValidationBadge.textContent = 'Invalid JSON';
-      elements.jsonValidationBadge.className = 'badge-validation invalid';
+      elements.jsonValidationBadge.textContent = 'INVALID JSON';
+      elements.jsonValidationBadge.className = 'badge-json invalid';
       elements.bodyErrorBox.hidden = false;
       if (elements.bodyErrorMsg) {
         elements.bodyErrorMsg.textContent = err.message;
       }
-      return { valid: false, error: err.message };
+      return false;
     }
   }
 
@@ -576,318 +726,286 @@
     if (!tab || !tab.body.trim()) return;
 
     try {
-      const parsed = JSON.parse(tab.body.trim());
+      const parsed = JSON.parse(tab.body);
       tab.body = JSON.stringify(parsed, null, 2);
       if (elements.inputBodyText) {
         elements.inputBodyText.value = tab.body;
       }
       validateBodyJson(tab.body);
-      showToast('JSON formatted successfully', 'success');
+      showToast('Formatted JSON body', 'success');
+      updateUnsavedIndicator();
     } catch (err) {
-      showToast('Cannot format: ' + err.message, 'error');
+      showToast('Cannot format invalid JSON: ' + err.message, 'error');
     }
   }
 
+  function clearBodyJson() {
+    const tab = getActiveTab();
+    if (!tab) return;
+    tab.body = '';
+    if (elements.inputBodyText) {
+      elements.inputBodyText.value = '';
+    }
+    validateBodyJson('');
+    if (elements.bodyActiveDot) {
+      elements.bodyActiveDot.hidden = true;
+    }
+    updateUnsavedIndicator();
+  }
+
   // ==========================================================================
-  // Render Response Workspace
+  // Switch Request Subtabs (Params, Headers, Body)
+  // ==========================================================================
+
+  function switchRequestSubtab(subtabName) {
+    const tab = getActiveTab();
+    if (tab) {
+      tab.activeSubtab = subtabName;
+    }
+
+    elements.subtabButtons.forEach((btn) => {
+      const isTarget = btn.getAttribute('data-subtab') === subtabName;
+      btn.className = `subtab-btn ${isTarget ? 'active' : ''}`;
+      btn.setAttribute('aria-selected', isTarget ? 'true' : 'false');
+    });
+
+    elements.subtabPanels.forEach((panel) => {
+      const isTarget = panel.getAttribute('data-panel') === subtabName;
+      panel.hidden = !isTarget;
+    });
+  }
+
+  // ==========================================================================
+  // Switch Response Subtabs (Body, Headers, Explain)
+  // ==========================================================================
+
+  function switchResponseSubtab(subtabName) {
+    const tab = getActiveTab();
+    if (tab) {
+      tab.responseSubtab = subtabName;
+    }
+
+    elements.respTabButtons.forEach((btn) => {
+      const isTarget = btn.getAttribute('data-resp-tab') === subtabName;
+      btn.className = `resp-tab-btn ${isTarget ? 'active' : ''}`;
+      btn.setAttribute('aria-selected', isTarget ? 'true' : 'false');
+    });
+
+    if (elements.respPanelBody) elements.respPanelBody.hidden = subtabName !== 'body';
+    if (elements.respPanelHeaders) elements.respPanelHeaders.hidden = subtabName !== 'headers';
+    if (elements.respPanelExplain) elements.respPanelExplain.hidden = subtabName !== 'explain';
+  }
+
+  // ==========================================================================
+  // Response Panel Rendering
   // ==========================================================================
 
   function renderResponseWorkspace() {
     const tab = getActiveTab();
     if (!tab) return;
 
-    resetResponseMeta();
+    // Reset visibility of major states
+    if (elements.responseEmptyState) elements.responseEmptyState.hidden = true;
+    if (elements.responseLoadingState) elements.responseLoadingState.hidden = true;
+    if (elements.responseNetworkError) elements.responseNetworkError.hidden = true;
+    if (elements.responseContentView) elements.responseContentView.hidden = true;
+
+    // Reset status pills
+    if (elements.statStatus) {
+      elements.statStatus.className = 'stat-value status-badge badge-empty';
+      elements.statStatus.textContent = '---';
+    }
+    if (elements.statTime) elements.statTime.textContent = '---';
+    if (elements.statSize) elements.statSize.textContent = '---';
+
+    // Toggle Send/Cancel buttons
+    const isLoading = tab.responseState === 'loading';
+    if (elements.btnSend) elements.btnSend.hidden = isLoading;
+    if (elements.btnCancel) elements.btnCancel.hidden = !isLoading;
+
+    if (tab.responseState === 'empty') {
+      if (elements.responseEmptyState) elements.responseEmptyState.hidden = false;
+      return;
+    }
 
     if (tab.responseState === 'loading') {
-      showResponseView('loading');
-      if (elements.loadingTargetUrl) {
-        elements.loadingTargetUrl.textContent = `${tab.method} ${tab.url || '(empty URL)'}`;
+      if (elements.responseLoadingState) {
+        elements.responseLoadingState.hidden = false;
+        if (elements.loadingTargetUrl) {
+          elements.loadingTargetUrl.textContent = `${tab.method} ${tab.url || '(empty URL)'}`;
+        }
       }
       return;
     }
 
     if (tab.responseState === 'error') {
-      showResponseView('error');
-      renderErrorCard(tab.error);
+      if (elements.responseNetworkError) {
+        elements.responseNetworkError.hidden = false;
+        const err = tab.error || { type: 'ERROR', message: 'Request failed', details: 'Unknown error' };
+        if (elements.errorTypeBadge) elements.errorTypeBadge.textContent = err.type;
+        if (elements.errorTitleText) elements.errorTitleText.textContent = err.message;
+        if (elements.errorDetailsText) elements.errorDetailsText.textContent = err.details || '';
+        if (elements.errorTimestamp) elements.errorTimestamp.textContent = new Date().toLocaleTimeString();
+      }
       return;
     }
 
     if (tab.responseState === 'success' && tab.response) {
-      showResponseView('content');
-      renderSuccessResponse(tab.response, tab.bodyViewMode, tab.responseSubtab);
+      if (elements.responseContentView) elements.responseContentView.hidden = false;
+
+      const resp = tab.response;
+
+      // Status Badge
+      if (elements.statStatus) {
+        const s = resp.status;
+        let badgeClass = 'badge-2xx';
+        if (s >= 300 && s < 400) badgeClass = 'badge-3xx';
+        else if (s >= 400 && s < 500) badgeClass = 'badge-4xx';
+        else if (s >= 500) badgeClass = 'badge-5xx';
+
+        elements.statStatus.className = `stat-value status-badge ${badgeClass}`;
+        elements.statStatus.textContent = `${resp.status} ${resp.statusText || ''}`;
+      }
+
+      // Timing & Size
+      if (elements.statTime) elements.statTime.textContent = `${resp.timeMs} ms`;
+      if (elements.statSize) elements.statSize.textContent = formatBytes(resp.sizeBytes || 0);
+
+      // Truncation Tag
+      if (elements.truncationWarningTag) {
+        elements.truncationWarningTag.hidden = !resp.isTruncated;
+      }
+
+      // Headers count
+      const headerKeys = resp.headers ? Object.keys(resp.headers) : [];
+      if (elements.respHeadersCountBadge) {
+        elements.respHeadersCountBadge.textContent = headerKeys.length;
+      }
+
+      // Render Body
+      renderResponseBody(resp, tab.bodyViewMode || 'pretty');
+
+      // Render Headers Table
+      renderResponseHeaders(resp.headers || {});
+
+      // Render Explain Tab
+      renderResponseExplain(resp);
+
+      // Ensure active subtab is visible
+      switchResponseSubtab(tab.responseSubtab || 'body');
+    }
+  }
+
+  function renderResponseBody(resp, mode) {
+    if (!elements.responseBodyPre) return;
+
+    const isEmpty = resp.body === '' || resp.body === null || resp.body === undefined;
+    if (elements.responseEmptyBodyNotice) {
+      elements.responseEmptyBodyNotice.hidden = !isEmpty;
+      if (elements.emptyBodyStatus) {
+        elements.emptyBodyStatus.textContent = `${resp.status} ${resp.statusText || ''}`;
+      }
+    }
+
+    if (isEmpty) {
+      elements.responseBodyPre.textContent = '';
       return;
     }
 
-    // Default: Empty
-    showResponseView('empty');
-  }
-
-  function showResponseView(viewName) {
-    if (elements.responseEmptyState) elements.responseEmptyState.hidden = viewName !== 'empty';
-    if (elements.responseLoadingState) elements.responseLoadingState.hidden = viewName !== 'loading';
-    if (elements.responseNetworkError) elements.responseNetworkError.hidden = viewName !== 'error';
-    if (elements.responseContentView) elements.responseContentView.hidden = viewName !== 'content';
-
-    // Toggle Send / Cancel buttons
-    if (elements.btnSend) {
-      elements.btnSend.disabled = viewName === 'loading';
-    }
-    if (elements.btnCancel) {
-      elements.btnCancel.hidden = viewName !== 'loading';
-    }
-    if (elements.btnSendLabel) {
-      elements.btnSendLabel.textContent = viewName === 'loading' ? 'Sending...' : 'Send';
-    }
-  }
-
-  function resetResponseMeta() {
-    if (elements.statStatus) {
-      elements.statStatus.textContent = '—';
-      elements.statStatus.className = 'stat-val empty';
-    }
-    if (elements.statTime) {
-      elements.statTime.textContent = '—';
-      elements.statTime.className = 'stat-val empty';
-    }
-    if (elements.statSize) {
-      elements.statSize.textContent = '—';
-      elements.statSize.className = 'stat-val empty';
-    }
-    if (elements.respHeadersCountBadge) {
-      elements.respHeadersCountBadge.hidden = true;
-    }
-  }
-
-  function renderSuccessResponse(resp, viewMode = 'pretty', activeTabName = 'body') {
-    // 1. Status Pill
-    if (elements.statStatus) {
-      elements.statStatus.textContent = `${resp.status} ${resp.statusText}`;
-      let statusClass = 'status-2xx';
-      if (resp.status >= 300 && resp.status < 400) statusClass = 'status-3xx';
-      else if (resp.status >= 400 && resp.status < 500) statusClass = 'status-4xx';
-      else if (resp.status >= 500) statusClass = 'status-5xx';
-      elements.statStatus.className = `stat-val resp-status-pill ${statusClass}`;
-    }
-
-    // 2. Time & Size
-    if (elements.statTime) {
-      elements.statTime.textContent = `${resp.timeMs} ms`;
-      elements.statTime.className = 'stat-val';
-    }
-    if (elements.statSize) {
-      elements.statSize.textContent = formatBytes(resp.sizeBytes);
-      elements.statSize.className = 'stat-val';
-    }
-
-    // 3. Body View
-    const bodyContent = resp.body || '';
-    const isEmptyBody = !bodyContent.trim() && (resp.status === 204 || resp.status === 304 || resp.effectiveUrl);
-
-    if (elements.responseEmptyBodyNotice) {
-      elements.responseEmptyBodyNotice.hidden = !isEmptyBody;
-      if (elements.emptyBodyStatus) {
-        elements.emptyBodyStatus.textContent = `${resp.status} ${resp.statusText}`;
+    let displayContent = resp.body;
+    if (mode === 'pretty' && (resp.contentType || '').includes('json')) {
+      try {
+        const parsed = JSON.parse(resp.body);
+        displayContent = JSON.stringify(parsed, null, 2);
+      } catch {
+        displayContent = resp.body;
       }
     }
 
-    if (elements.truncationWarningTag) {
-      elements.truncationWarningTag.hidden = !resp.truncated;
-    }
-
-    if (elements.responseBodyPre) {
-      if (isEmptyBody) {
-        elements.responseBodyPre.textContent = '';
-      } else if (viewMode === 'pretty') {
-        try {
-          const parsed = JSON.parse(bodyContent);
-          elements.responseBodyPre.textContent = JSON.stringify(parsed, null, 2);
-        } catch {
-          // If not JSON, show safe decoded text
-          elements.responseBodyPre.textContent = bodyContent;
-        }
-      } else {
-        // Raw Mode
-        elements.responseBodyPre.textContent = bodyContent;
-      }
-    }
-
-    // Mode toggles
-    if (elements.btnModePretty) elements.btnModePretty.className = `btn-submode ${viewMode === 'pretty' ? 'active' : ''}`;
-    if (elements.btnModeRaw) elements.btnModeRaw.className = `btn-submode ${viewMode === 'raw' ? 'active' : ''}`;
-
-    // 4. Response Headers
-    renderResponseHeadersTable(resp.headers);
-
-    // 5. Explain Tab
-    renderExplainTab(resp);
-
-    // Switch to active response subtab
-    switchResponseSubtab(activeTabName);
+    elements.responseBodyPre.textContent = displayContent;
   }
 
-  function renderResponseHeadersTable(headersObj = {}) {
+  function renderResponseHeaders(headers) {
     if (!elements.responseHeadersTbody) return;
     elements.responseHeadersTbody.innerHTML = '';
 
-    const entries = Object.entries(headersObj);
-    if (elements.respHeadersCountBadge) {
-      elements.respHeadersCountBadge.hidden = entries.length === 0;
-      elements.respHeadersCountBadge.textContent = entries.length;
+    const entries = Object.entries(headers);
+    if (entries.length === 0) {
+      const tr = document.createElement('tr');
+      tr.innerHTML = '<td colspan="2" style="color: var(--text-muted); text-align: center; padding: 16px;">No headers returned</td>';
+      elements.responseHeadersTbody.appendChild(tr);
+      return;
     }
 
-    entries.forEach(([key, val]) => {
+    entries.forEach(([key, value]) => {
       const tr = document.createElement('tr');
-
-      const tdKey = document.createElement('td');
-      tdKey.className = 'col-key';
-      tdKey.textContent = key;
-
-      const tdVal = document.createElement('td');
-      tdVal.className = 'col-val';
-      tdVal.textContent = val;
-
-      const tdAct = document.createElement('td');
-      tdAct.className = 'col-act';
-      const btnCopy = document.createElement('button');
-      btnCopy.className = 'btn-kv-delete';
-      btnCopy.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>`;
-      btnCopy.title = 'Copy value';
-      btnCopy.addEventListener('click', () => {
-        copyText(val, `Copied ${key}`);
-      });
-      tdAct.appendChild(btnCopy);
-
-      tr.appendChild(tdKey);
-      tr.appendChild(tdVal);
-      tr.appendChild(tdAct);
+      const tdK = document.createElement('td');
+      tdK.className = 'header-name';
+      tdK.textContent = key;
+      const tdV = document.createElement('td');
+      tdV.className = 'header-val';
+      tdV.textContent = value;
+      tr.appendChild(tdK);
+      tr.appendChild(tdV);
       elements.responseHeadersTbody.appendChild(tr);
     });
   }
 
-  function renderExplainTab(resp) {
-    if (!resp) return;
-
+  function renderResponseExplain(resp) {
     if (elements.explainStatusTitle) {
-      elements.explainStatusTitle.textContent = `HTTP ${resp.status} ${resp.statusText}`;
+      elements.explainStatusTitle.textContent = `${resp.status} ${resp.statusText || ''}`;
     }
-
-    if (elements.explainUrlVal) {
-      elements.explainUrlVal.textContent = resp.effectiveUrl || 'N/A';
-    }
-
-    if (elements.explainContentType) {
-      elements.explainContentType.textContent = resp.contentType || 'none';
-    }
-
     if (elements.explainStatusDesc) {
-      let desc = '';
-      if (resp.status === 200) desc = 'Standard success code. The Spring Boot controller executed and returned the payload entity.';
-      else if (resp.status === 201) desc = 'Resource created. Commonly returned by Spring Boot @PostMapping after persisting a new record.';
-      else if (resp.status === 204) desc = 'No Content. Often returned by @DeleteMapping or void methods when an action completes without returning body data.';
-      else if (resp.status === 400) desc = 'Bad Request. Commonly triggered by Spring Boot validation failures (@Valid, BindingResult) or unreadable JSON bodies.';
-      else if (resp.status === 401) desc = 'Unauthorized. Spring Security denied access. An Authorization header (e.g. Bearer JWT) is typically required.';
-      else if (resp.status === 403) desc = 'Forbidden. The user was authenticated, but lacks the necessary role or authority for this endpoint.';
-      else if (resp.status === 404) desc = 'Not Found. No Spring RequestMapping matched the URL path, or the queried database record does not exist.';
-      else if (resp.status === 405) desc = 'Method Not Allowed. The URL exists in Spring Boot, but does not support this HTTP method.';
-      else if (resp.status === 500) desc = 'Internal Server Error. An unhandled exception was thrown inside the Spring Boot service layer.';
-      else desc = `Server returned status code ${resp.status}. Consult your Spring Boot server logs for further controller details.`;
-
+      let desc = 'Standard HTTP response.';
+      if (resp.status >= 200 && resp.status < 300) desc = 'The request succeeded and the server processed the response normally.';
+      else if (resp.status >= 300 && resp.status < 400) desc = 'Redirection action required to complete the request.';
+      else if (resp.status === 400) desc = 'Bad Request: The server could not understand the request due to invalid syntax.';
+      else if (resp.status === 401) desc = 'Unauthorized: Authentication is required and has failed or not been provided.';
+      else if (resp.status === 403) desc = 'Forbidden: The client does not have access rights to the content.';
+      else if (resp.status === 404) desc = 'Not Found: The server cannot find the requested resource.';
+      else if (resp.status >= 500) desc = 'Server Error: The server encountered an unexpected condition.';
       elements.explainStatusDesc.textContent = desc;
     }
-  }
-
-  function renderErrorCard(error) {
-    if (!error) return;
-
-    if (elements.statStatus) {
-      elements.statStatus.textContent = error.type || 'ERROR';
-      elements.statStatus.className = 'stat-val resp-status-pill status-error';
+    if (elements.explainUrlVal) {
+      elements.explainUrlVal.textContent = resp.url || '---';
     }
-
-    if (elements.errorTypeBadge) {
-      elements.errorTypeBadge.textContent = error.type || 'NETWORK_ERROR';
+    if (elements.explainContentType) {
+      elements.explainContentType.textContent = resp.contentType || 'Not specified';
     }
-
-    if (elements.errorTitleText) {
-      elements.errorTitleText.textContent = error.message || 'Request Failed';
-    }
-
-    if (elements.errorDetailsText) {
-      elements.errorDetailsText.textContent = error.details || 'The network request could not be completed.';
-    }
-
-    if (elements.errorTimestamp) {
-      elements.errorTimestamp.textContent = new Date().toLocaleTimeString();
-    }
-  }
-
-  function switchResponseSubtab(tabName) {
-    const tab = getActiveTab();
-    if (tab) tab.responseSubtab = tabName;
-
-    elements.respTabButtons.forEach((btn) => {
-      const match = btn.getAttribute('data-resptab') === tabName;
-      btn.className = `resp-tab-btn ${match ? 'active' : ''}`;
-      btn.setAttribute('aria-selected', match ? 'true' : 'false');
-    });
-
-    if (elements.respPanelBody) elements.respPanelBody.hidden = tabName !== 'body';
-    if (elements.respPanelHeaders) elements.respPanelHeaders.hidden = tabName !== 'headers';
-    if (elements.respPanelExplain) elements.respPanelExplain.hidden = tabName !== 'explain';
-  }
-
-  function switchRequestSubtab(subtabName) {
-    const tab = getActiveTab();
-    if (tab) tab.activeSubtab = subtabName;
-
-    elements.subtabButtons.forEach((btn) => {
-      const match = btn.getAttribute('data-subtab') === subtabName;
-      btn.className = `subtab-btn ${match ? 'active' : ''}`;
-      btn.setAttribute('aria-selected', match ? 'true' : 'false');
-    });
-
-    elements.subtabPanels.forEach((panel) => {
-      if (panel.id === `panel-${subtabName}`) {
-        panel.removeAttribute('hidden');
-        panel.classList.add('active');
-      } else {
-        panel.setAttribute('hidden', '');
-        panel.classList.remove('active');
-      }
-    });
   }
 
   // ==========================================================================
-  // Send and Cancel HTTP Request Action
+  // HTTP Request Execution Engine
   // ==========================================================================
 
   async function executeSend() {
     const tab = getActiveTab();
     if (!tab) return;
 
-    const trimmedUrl = (elements.inputUrl?.value || tab.url || '').trim();
+    const trimmedUrl = (tab.url || '').trim();
     if (!trimmedUrl) {
-      showToast('Please enter a valid HTTP or HTTPS URL', 'error');
+      showToast('Please enter a request URL', 'error');
       if (elements.inputUrl) elements.inputUrl.focus();
       return;
     }
 
-    if (!trimmedUrl.startsWith('http://') && !trimmedUrl.startsWith('https://')) {
-      showToast('Only HTTP and HTTPS URLs are supported', 'error');
-      return;
-    }
-
-    if ((tab.method === 'GET' || tab.method === 'HEAD') && tab.body.trim()) {
+    if ((tab.method === 'GET' || tab.method === 'HEAD') && tab.body && tab.body.trim()) {
       showToast(`Method ${tab.method} cannot send a request body`, 'error');
       return;
     }
 
-    // Set Loading State
+    if (tab.method !== 'GET' && tab.method !== 'HEAD' && tab.body && tab.body.trim()) {
+      if (!validateBodyJson(tab.body)) {
+        showToast('Invalid JSON body: please fix before sending', 'error');
+        switchRequestSubtab('body');
+        return;
+      }
+    }
+
     tab.responseState = 'loading';
     tab.response = null;
     tab.error = null;
     tab.activeRequestId = 'req_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7);
-
     renderResponseWorkspace();
 
     const requestPayload = {
@@ -896,7 +1014,7 @@
       url: trimmedUrl,
       params: tab.params,
       headers: tab.headers,
-      body: (tab.method !== 'GET' && tab.method !== 'HEAD' && tab.body) ? tab.body : null,
+      body: tab.method === 'GET' || tab.method === 'HEAD' ? null : tab.body || null,
       timeoutMs: 15000
     };
 
@@ -952,6 +1070,791 @@
     } catch (err) {
       console.warn('Error during cancellation:', err);
     }
+  }
+
+  // ==========================================================================
+  // Step 3: Collections & Folders Management
+  // ==========================================================================
+
+  async function loadCollectionsTree() {
+    try {
+      if (!window.apiForge || typeof window.apiForge.getCollectionsTree !== 'function') {
+        return;
+      }
+      state.collectionsTree = await window.apiForge.getCollectionsTree();
+      renderCollectionsTree();
+      updateBreadcrumb();
+    } catch (err) {
+      console.error('[ApiForge Lite] Error loading collections tree:', err);
+      showToast('Failed to load collections: ' + err.message, 'error');
+    }
+  }
+
+  function renderCollectionsTree() {
+    if (!elements.collectionsTreeView) return;
+    elements.collectionsTreeView.innerHTML = '';
+
+    if (!state.collectionsTree || state.collectionsTree.length === 0) {
+      const emptyBox = document.createElement('div');
+      emptyBox.className = 'collections-empty';
+      emptyBox.innerHTML = `
+        <p>No collections created yet</p>
+        <button class="btn btn-secondary btn-sm" id="btn-empty-create-col">+ New Collection</button>
+      `;
+      elements.collectionsTreeView.appendChild(emptyBox);
+
+      const emptyBtn = document.getElementById('btn-empty-create-col');
+      if (emptyBtn) {
+        emptyBtn.addEventListener('click', () => openCreateCollectionModal());
+      }
+      return;
+    }
+
+    state.collectionsTree.forEach((col) => {
+      renderCollectionNode(col);
+    });
+  }
+
+  function renderCollectionNode(col) {
+    const isExpanded = state.expandedNodes.has(col.id);
+    const hasChildren = (col.folders && col.folders.length > 0) || (col.requests && col.requests.length > 0);
+
+    const colNode = document.createElement('div');
+    colNode.className = 'tree-node tree-collection-node';
+    colNode.setAttribute('data-id', col.id);
+
+    const row = document.createElement('div');
+    row.className = 'tree-row';
+    row.style.setProperty('--indent-level', '0');
+
+    // Chevron
+    const chevron = document.createElement('span');
+    chevron.className = `tree-chevron ${isExpanded ? 'expanded' : ''} ${!hasChildren ? 'hidden' : ''}`;
+    chevron.innerHTML = `<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg>`;
+    chevron.addEventListener('click', (e) => {
+      e.stopPropagation();
+      toggleNodeExpanded(col.id);
+    });
+    row.appendChild(chevron);
+
+    // Icon
+    const icon = document.createElement('span');
+    icon.className = 'tree-icon';
+    icon.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>`;
+    row.appendChild(icon);
+
+    // Title
+    const title = document.createElement('span');
+    title.className = 'tree-title';
+    title.textContent = col.name;
+    title.title = col.name;
+    row.appendChild(title);
+
+    // Action buttons
+    const actions = document.createElement('div');
+    actions.className = 'tree-actions';
+
+    // 1. Add Folder
+    const btnAddFolder = document.createElement('button');
+    btnAddFolder.className = 'tree-action-btn';
+    btnAddFolder.title = 'Add folder';
+    btnAddFolder.innerHTML = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path><line x1="12" y1="11" x2="12" y2="17"></line><line x1="9" y1="14" x2="15" y2="14"></line></svg>`;
+    btnAddFolder.addEventListener('click', (e) => {
+      e.stopPropagation();
+      openCreateFolderModal(col.id, null);
+    });
+    actions.appendChild(btnAddFolder);
+
+    // 2. Add Request
+    const btnAddReq = document.createElement('button');
+    btnAddReq.className = 'tree-action-btn';
+    btnAddReq.title = 'Add request to collection';
+    btnAddReq.innerHTML = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>`;
+    btnAddReq.addEventListener('click', (e) => {
+      e.stopPropagation();
+      openSaveModalForNew(col.id, null);
+    });
+    actions.appendChild(btnAddReq);
+
+    // 3. Rename
+    const btnRename = document.createElement('button');
+    btnRename.className = 'tree-action-btn';
+    btnRename.title = 'Rename collection';
+    btnRename.innerHTML = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>`;
+    btnRename.addEventListener('click', (e) => {
+      e.stopPropagation();
+      openRenameCollectionModal(col.id, col.name);
+    });
+    actions.appendChild(btnRename);
+
+    // 4. Duplicate
+    const btnDuplicate = document.createElement('button');
+    btnDuplicate.className = 'tree-action-btn';
+    btnDuplicate.title = 'Duplicate collection';
+    btnDuplicate.innerHTML = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>`;
+    btnDuplicate.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      try {
+        await window.apiForge.duplicateCollection(col.id);
+        showToast(`Duplicated collection "${col.name}"`, 'success');
+        await loadCollectionsTree();
+      } catch (err) {
+        showToast('Duplicate error: ' + err.message, 'error');
+      }
+    });
+    actions.appendChild(btnDuplicate);
+
+    // 5. Delete
+    const btnDelete = document.createElement('button');
+    btnDelete.className = 'tree-action-btn btn-danger';
+    btnDelete.title = 'Delete collection';
+    btnDelete.innerHTML = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>`;
+    btnDelete.addEventListener('click', (e) => {
+      e.stopPropagation();
+      openDeleteConfirmModal({
+        title: 'Delete Collection',
+        message: `Are you sure you want to delete collection "${col.name}" and all its contents?`,
+        onConfirm: async () => {
+          await window.apiForge.deleteCollection(col.id);
+          showToast(`Deleted collection "${col.name}"`, 'info');
+          await loadCollectionsTree();
+        }
+      });
+    });
+    actions.appendChild(btnDelete);
+
+    row.appendChild(actions);
+
+    row.addEventListener('click', () => {
+      toggleNodeExpanded(col.id);
+    });
+
+    colNode.appendChild(row);
+
+    // If expanded, render children
+    if (isExpanded) {
+      // 1. Root requests
+      if (col.requests && col.requests.length > 0) {
+        col.requests.forEach((req) => {
+          renderRequestNode(col.id, null, req, 1, colNode);
+        });
+      }
+
+      // 2. Folders
+      if (col.folders && col.folders.length > 0) {
+        col.folders.forEach((fld) => {
+          renderFolderNode(col.id, fld, 1, colNode);
+        });
+      }
+    }
+
+    elements.collectionsTreeView.appendChild(colNode);
+  }
+
+  function renderFolderNode(collectionId, folder, level, parentContainer) {
+    const isExpanded = state.expandedNodes.has(folder.id);
+    const hasChildren = (folder.children && folder.children.length > 0) || (folder.requests && folder.requests.length > 0);
+
+    const folderNode = document.createElement('div');
+    folderNode.className = 'tree-node tree-folder-node';
+    folderNode.setAttribute('data-id', folder.id);
+
+    const row = document.createElement('div');
+    row.className = 'tree-row';
+    row.style.setProperty('--indent-level', String(level));
+
+    // Chevron
+    const chevron = document.createElement('span');
+    chevron.className = `tree-chevron ${isExpanded ? 'expanded' : ''} ${!hasChildren ? 'hidden' : ''}`;
+    chevron.innerHTML = `<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg>`;
+    chevron.addEventListener('click', (e) => {
+      e.stopPropagation();
+      toggleNodeExpanded(folder.id);
+    });
+    row.appendChild(chevron);
+
+    // Icon
+    const icon = document.createElement('span');
+    icon.className = 'tree-icon';
+    icon.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>`;
+    row.appendChild(icon);
+
+    // Title
+    const title = document.createElement('span');
+    title.className = 'tree-title';
+    title.textContent = folder.name;
+    title.title = folder.name;
+    row.appendChild(title);
+
+    // Actions
+    const actions = document.createElement('div');
+    actions.className = 'tree-actions';
+
+    // 1. Add Subfolder
+    const btnAddSubfolder = document.createElement('button');
+    btnAddSubfolder.className = 'tree-action-btn';
+    btnAddSubfolder.title = 'Add subfolder';
+    btnAddSubfolder.innerHTML = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path><line x1="12" y1="11" x2="12" y2="17"></line><line x1="9" y1="14" x2="15" y2="14"></line></svg>`;
+    btnAddSubfolder.addEventListener('click', (e) => {
+      e.stopPropagation();
+      openCreateFolderModal(collectionId, folder.id);
+    });
+    actions.appendChild(btnAddSubfolder);
+
+    // 2. Add Request
+    const btnAddReq = document.createElement('button');
+    btnAddReq.className = 'tree-action-btn';
+    btnAddReq.title = 'Add request to folder';
+    btnAddReq.innerHTML = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>`;
+    btnAddReq.addEventListener('click', (e) => {
+      e.stopPropagation();
+      openSaveModalForNew(collectionId, folder.id);
+    });
+    actions.appendChild(btnAddReq);
+
+    // 3. Rename
+    const btnRename = document.createElement('button');
+    btnRename.className = 'tree-action-btn';
+    btnRename.title = 'Rename folder';
+    btnRename.innerHTML = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>`;
+    btnRename.addEventListener('click', (e) => {
+      e.stopPropagation();
+      openRenameFolderModal(collectionId, folder.id, folder.name);
+    });
+    actions.appendChild(btnRename);
+
+    // 4. Duplicate
+    const btnDuplicate = document.createElement('button');
+    btnDuplicate.className = 'tree-action-btn';
+    btnDuplicate.title = 'Duplicate folder';
+    btnDuplicate.innerHTML = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>`;
+    btnDuplicate.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      try {
+        await window.apiForge.duplicateFolder(collectionId, folder.id);
+        showToast(`Duplicated folder "${folder.name}"`, 'success');
+        await loadCollectionsTree();
+      } catch (err) {
+        showToast('Duplicate error: ' + err.message, 'error');
+      }
+    });
+    actions.appendChild(btnDuplicate);
+
+    // 5. Delete
+    const btnDelete = document.createElement('button');
+    btnDelete.className = 'tree-action-btn btn-danger';
+    btnDelete.title = 'Delete folder';
+    btnDelete.innerHTML = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>`;
+    btnDelete.addEventListener('click', (e) => {
+      e.stopPropagation();
+      openDeleteConfirmModal({
+        title: 'Delete Folder',
+        message: `Are you sure you want to delete folder "${folder.name}" and all its contents?`,
+        onConfirm: async () => {
+          await window.apiForge.deleteFolder(collectionId, folder.id);
+          showToast(`Deleted folder "${folder.name}"`, 'info');
+          await loadCollectionsTree();
+        }
+      });
+    });
+    actions.appendChild(btnDelete);
+
+    row.appendChild(actions);
+
+    row.addEventListener('click', () => {
+      toggleNodeExpanded(folder.id);
+    });
+
+    folderNode.appendChild(row);
+
+    // If expanded, render folder requests and subfolders
+    if (isExpanded) {
+      if (folder.requests && folder.requests.length > 0) {
+        folder.requests.forEach((req) => {
+          renderRequestNode(collectionId, folder.id, req, level + 1, folderNode);
+        });
+      }
+      if (folder.children && folder.children.length > 0) {
+        folder.children.forEach((child) => {
+          renderFolderNode(collectionId, child, level + 1, folderNode);
+        });
+      }
+    }
+
+    parentContainer.appendChild(folderNode);
+  }
+
+  function renderRequestNode(collectionId, folderId, req, level, parentContainer) {
+    const reqNode = document.createElement('div');
+    reqNode.className = 'tree-node tree-request-node';
+    reqNode.setAttribute('data-id', req.id);
+
+    const activeTab = getActiveTab();
+    const isCurrentActive = activeTab && activeTab.savedMeta && activeTab.savedMeta.requestId === req.id;
+
+    const row = document.createElement('div');
+    row.className = `tree-row ${isCurrentActive ? 'active' : ''}`;
+    row.style.setProperty('--indent-level', String(level));
+
+    // Spacer matching chevron width
+    const spacer = document.createElement('span');
+    spacer.className = 'tree-chevron hidden';
+    row.appendChild(spacer);
+
+    // Method badge
+    const badge = document.createElement('span');
+    const methodLower = (req.method || 'GET').toLowerCase();
+    badge.className = `tree-method-badge tree-method-${methodLower}`;
+    badge.textContent = req.method || 'GET';
+    row.appendChild(badge);
+
+    // Title
+    const title = document.createElement('span');
+    title.className = 'tree-title';
+    title.textContent = req.name || 'Untitled Request';
+    title.title = req.name || 'Untitled Request';
+    row.appendChild(title);
+
+    // Actions
+    const actions = document.createElement('div');
+    actions.className = 'tree-actions';
+
+    // 1. Rename
+    const btnRename = document.createElement('button');
+    btnRename.className = 'tree-action-btn';
+    btnRename.title = 'Rename request';
+    btnRename.innerHTML = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>`;
+    btnRename.addEventListener('click', (e) => {
+      e.stopPropagation();
+      openRenameRequestModal(collectionId, req.id, req.name);
+    });
+    actions.appendChild(btnRename);
+
+    // 2. Duplicate
+    const btnDuplicate = document.createElement('button');
+    btnDuplicate.className = 'tree-action-btn';
+    btnDuplicate.title = 'Duplicate request';
+    btnDuplicate.innerHTML = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>`;
+    btnDuplicate.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      try {
+        await window.apiForge.duplicateRequest(collectionId, req.id);
+        showToast(`Duplicated request "${req.name}"`, 'success');
+        await loadCollectionsTree();
+      } catch (err) {
+        showToast('Duplicate error: ' + err.message, 'error');
+      }
+    });
+    actions.appendChild(btnDuplicate);
+
+    // 3. Delete
+    const btnDelete = document.createElement('button');
+    btnDelete.className = 'tree-action-btn btn-danger';
+    btnDelete.title = 'Delete request';
+    btnDelete.innerHTML = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>`;
+    btnDelete.addEventListener('click', (e) => {
+      e.stopPropagation();
+      openDeleteConfirmModal({
+        title: 'Delete Request',
+        message: `Are you sure you want to delete request "${req.name}"?`,
+        onConfirm: async () => {
+          await window.apiForge.deleteRequest(collectionId, req.id);
+          showToast(`Deleted request "${req.name}"`, 'info');
+          await loadCollectionsTree();
+        }
+      });
+    });
+    actions.appendChild(btnDelete);
+
+    row.appendChild(actions);
+
+    row.addEventListener('click', () => {
+      openSavedRequest(collectionId, req.id);
+    });
+
+    reqNode.appendChild(row);
+    parentContainer.appendChild(reqNode);
+  }
+
+  function toggleNodeExpanded(nodeId) {
+    if (state.expandedNodes.has(nodeId)) {
+      state.expandedNodes.delete(nodeId);
+    } else {
+      state.expandedNodes.add(nodeId);
+    }
+    renderCollectionsTree();
+  }
+
+  // ==========================================================================
+  // Reopen Saved Request in Editor
+  // ==========================================================================
+
+  async function openSavedRequest(collectionId, requestId) {
+    try {
+      const reqData = await window.apiForge.getRequest(collectionId, requestId);
+      if (!reqData) {
+        showToast('Saved request not found', 'error');
+        return;
+      }
+
+      // Check if an existing open tab is already this request
+      const existingTab = state.tabs.find((t) => t.savedMeta && t.savedMeta.requestId === requestId);
+      if (existingTab) {
+        setActiveTab(existingTab.id);
+        renderCollectionsTree();
+        return;
+      }
+
+      // Check if active tab is clean/empty (not saved and no content entered)
+      let targetTab = getActiveTab();
+      const isClean =
+        targetTab &&
+        !targetTab.url &&
+        !targetTab.body &&
+        targetTab.params.length === 0 &&
+        targetTab.headers.length === 0 &&
+        !targetTab.savedMeta;
+
+      if (!isClean) {
+        targetTab = createTab({
+          title: reqData.name || 'Saved Request',
+          isCustomTitle: true
+        });
+      }
+
+      targetTab.title = reqData.name || 'Saved Request';
+      targetTab.isCustomTitle = true;
+      targetTab.method = reqData.method || 'GET';
+      targetTab.url = reqData.url || '';
+      targetTab.params = Array.isArray(reqData.params) ? JSON.parse(JSON.stringify(reqData.params)) : [];
+      targetTab.headers = Array.isArray(reqData.headers) ? JSON.parse(JSON.stringify(reqData.headers)) : [];
+      targetTab.body = reqData.body || '';
+
+      targetTab.savedMeta = {
+        collectionId,
+        folderId: reqData.folderId || null,
+        requestId: reqData.id,
+        savedName: reqData.name
+      };
+
+      targetTab.savedSnapshot = getRequestSnapshot(targetTab);
+
+      setActiveTab(targetTab.id);
+      renderCollectionsTree();
+      showToast(`Opened: ${reqData.name}`, 'info');
+    } catch (err) {
+      console.error('[ApiForge Lite] Error reopening saved request:', err);
+      showToast('Failed to open request: ' + err.message, 'error');
+    }
+  }
+
+  // ==========================================================================
+  // Save Request Actions (Save & Save As)
+  // ==========================================================================
+
+  async function handleSaveRequest() {
+    const tab = getActiveTab();
+    if (!tab) return;
+
+    // If tab is already saved into a collection and folder, update directly
+    if (tab.savedMeta && tab.savedMeta.collectionId && tab.savedMeta.requestId) {
+      try {
+        await window.apiForge.saveRequest({
+          collectionId: tab.savedMeta.collectionId,
+          folderId: tab.savedMeta.folderId,
+          requestId: tab.savedMeta.requestId,
+          request: {
+            name: tab.savedMeta.savedName || tab.title,
+            method: tab.method,
+            url: tab.url,
+            params: tab.params,
+            headers: tab.headers,
+            body: tab.body
+          }
+        });
+
+        tab.savedSnapshot = getRequestSnapshot(tab);
+        updateUnsavedIndicator();
+        await loadCollectionsTree();
+        showToast(`Saved "${tab.savedMeta.savedName || tab.title}"`, 'success');
+      } catch (err) {
+        showToast('Save failed: ' + err.message, 'error');
+      }
+    } else {
+      // Unsaved request: open Save Modal
+      openSaveModal();
+    }
+  }
+
+  function openSaveModal() {
+    const tab = getActiveTab();
+    if (!tab) return;
+
+    if (!state.collectionsTree || state.collectionsTree.length === 0) {
+      showToast('Please create a collection first before saving requests.', 'info');
+      openCreateCollectionModal();
+      return;
+    }
+
+    if (elements.saveRequestName) {
+      elements.saveRequestName.value = tab.savedMeta?.savedName || (tab.url ? tab.title : 'New Request');
+    }
+
+    // Populate Collections dropdown
+    if (elements.saveTargetCollection) {
+      elements.saveTargetCollection.innerHTML = '';
+      state.collectionsTree.forEach((c) => {
+        const opt = document.createElement('option');
+        opt.value = c.id;
+        opt.textContent = c.name;
+        if (tab.savedMeta && tab.savedMeta.collectionId === c.id) {
+          opt.selected = true;
+        }
+        elements.saveTargetCollection.appendChild(opt);
+      });
+
+      // Update folders dropdown for selected collection
+      updateSaveModalFolders();
+    }
+
+    openModal(elements.modalSaveRequest);
+    if (elements.saveRequestName) {
+      elements.saveRequestName.focus();
+      elements.saveRequestName.select();
+    }
+  }
+
+  function openSaveModalForNew(collectionId, folderId) {
+    if (!collectionId) return;
+
+    // Create a new tab first
+    createTab({
+      title: 'New Request',
+      method: 'GET',
+      url: ''
+    });
+
+    if (elements.saveRequestName) {
+      elements.saveRequestName.value = 'New Request';
+    }
+
+    if (elements.saveTargetCollection) {
+      elements.saveTargetCollection.innerHTML = '';
+      state.collectionsTree.forEach((c) => {
+        const opt = document.createElement('option');
+        opt.value = c.id;
+        opt.textContent = c.name;
+        if (c.id === collectionId) opt.selected = true;
+        elements.saveTargetCollection.appendChild(opt);
+      });
+      updateSaveModalFolders(folderId);
+    }
+
+    openModal(elements.modalSaveRequest);
+    if (elements.saveRequestName) {
+      elements.saveRequestName.focus();
+      elements.saveRequestName.select();
+    }
+  }
+
+  function updateSaveModalFolders(preselectFolderId = null) {
+    if (!elements.saveTargetFolder || !elements.saveTargetCollection) return;
+    elements.saveTargetFolder.innerHTML = '<option value="">Root (No Folder)</option>';
+
+    const selectedColId = elements.saveTargetCollection.value;
+    const col = state.collectionsTree.find((c) => c.id === selectedColId);
+    if (!col || !col.folders) return;
+
+    function addFolderOptions(folders, prefix = '') {
+      folders.forEach((f) => {
+        const opt = document.createElement('option');
+        opt.value = f.id;
+        opt.textContent = `${prefix}${f.name}`;
+        if (preselectFolderId && preselectFolderId === f.id) {
+          opt.selected = true;
+        }
+        elements.saveTargetFolder.appendChild(opt);
+        if (f.children && f.children.length > 0) {
+          addFolderOptions(f.children, prefix + '— ');
+        }
+      });
+    }
+
+    addFolderOptions(col.folders);
+  }
+
+  async function handleConfirmSaveModal() {
+    const tab = getActiveTab();
+    if (!tab) return;
+
+    const name = elements.saveRequestName ? elements.saveRequestName.value.trim() : '';
+    if (!name) {
+      showToast('Please enter a request name', 'error');
+      if (elements.saveRequestName) elements.saveRequestName.focus();
+      return;
+    }
+
+    const collectionId = elements.saveTargetCollection ? elements.saveTargetCollection.value : null;
+    if (!collectionId) {
+      showToast('Please select a collection', 'error');
+      return;
+    }
+
+    const folderId = elements.saveTargetFolder && elements.saveTargetFolder.value ? elements.saveTargetFolder.value : null;
+
+    try {
+      const saved = await window.apiForge.saveRequest({
+        collectionId,
+        folderId,
+        requestId: null, // Always create a fresh entry on modal confirm
+        request: {
+          name,
+          method: tab.method,
+          url: tab.url,
+          params: tab.params,
+          headers: tab.headers,
+          body: tab.body
+        }
+      });
+
+      tab.title = saved.name;
+      tab.isCustomTitle = true;
+      tab.savedMeta = {
+        collectionId,
+        folderId: saved.folderId || null,
+        requestId: saved.id,
+        savedName: saved.name
+      };
+
+      tab.savedSnapshot = getRequestSnapshot(tab);
+      closeActiveModal();
+      updateUnsavedIndicator();
+
+      // Expand the destination collection and folder
+      state.expandedNodes.add(collectionId);
+      if (folderId) state.expandedNodes.add(folderId);
+
+      await loadCollectionsTree();
+      showToast(`Saved request "${saved.name}"`, 'success');
+    } catch (err) {
+      showToast('Save error: ' + err.message, 'error');
+    }
+  }
+
+  // ==========================================================================
+  // Modal Management Framework
+  // ==========================================================================
+
+  function openModal(modalEl) {
+    closeActiveModal();
+    if (!modalEl) return;
+    if (elements.modalBackdrop) elements.modalBackdrop.hidden = false;
+    modalEl.hidden = false;
+    state.activeModal = modalEl;
+  }
+
+  function closeActiveModal() {
+    if (elements.modalBackdrop) elements.modalBackdrop.hidden = true;
+    if (elements.modalSaveRequest) elements.modalSaveRequest.hidden = true;
+    if (elements.modalCollection) elements.modalCollection.hidden = true;
+    if (elements.modalFolder) elements.modalFolder.hidden = true;
+    if (elements.modalRenameRequest) elements.modalRenameRequest.hidden = true;
+    if (elements.modalDelete) elements.modalDelete.hidden = true;
+    state.activeModal = null;
+    state.pendingModalAction = null;
+  }
+
+  // Collection Modals
+  function openCreateCollectionModal() {
+    if (elements.modalColTitle) elements.modalColTitle.textContent = 'Create Collection';
+    if (elements.collectionNameInput) elements.collectionNameInput.value = '';
+    state.pendingModalAction = async (name) => {
+      const col = await window.apiForge.createCollection(name);
+      state.expandedNodes.add(col.id);
+      showToast(`Created collection "${col.name}"`, 'success');
+      await loadCollectionsTree();
+    };
+    openModal(elements.modalCollection);
+    if (elements.collectionNameInput) elements.collectionNameInput.focus();
+  }
+
+  function openRenameCollectionModal(collectionId, currentName) {
+    if (elements.modalColTitle) elements.modalColTitle.textContent = 'Rename Collection';
+    if (elements.collectionNameInput) elements.collectionNameInput.value = currentName || '';
+    state.pendingModalAction = async (name) => {
+      await window.apiForge.renameCollection(collectionId, name);
+      showToast(`Renamed collection to "${name}"`, 'success');
+      await loadCollectionsTree();
+    };
+    openModal(elements.modalCollection);
+    if (elements.collectionNameInput) {
+      elements.collectionNameInput.focus();
+      elements.collectionNameInput.select();
+    }
+  }
+
+  // Folder Modals
+  function openCreateFolderModal(collectionId, parentFolderId = null) {
+    if (elements.modalFldTitle) elements.modalFldTitle.textContent = parentFolderId ? 'Create Subfolder' : 'Create Folder';
+    if (elements.folderNameInput) elements.folderNameInput.value = '';
+    state.pendingModalAction = async (name) => {
+      const fld = await window.apiForge.createFolder(collectionId, parentFolderId, name);
+      state.expandedNodes.add(collectionId);
+      if (parentFolderId) state.expandedNodes.add(parentFolderId);
+      state.expandedNodes.add(fld.id);
+      showToast(`Created folder "${fld.name}"`, 'success');
+      await loadCollectionsTree();
+    };
+    openModal(elements.modalFolder);
+    if (elements.folderNameInput) elements.folderNameInput.focus();
+  }
+
+  function openRenameFolderModal(collectionId, folderId, currentName) {
+    if (elements.modalFldTitle) elements.modalFldTitle.textContent = 'Rename Folder';
+    if (elements.folderNameInput) elements.folderNameInput.value = currentName || '';
+    state.pendingModalAction = async (name) => {
+      await window.apiForge.renameFolder(collectionId, folderId, name);
+      showToast(`Renamed folder to "${name}"`, 'success');
+      await loadCollectionsTree();
+    };
+    openModal(elements.modalFolder);
+    if (elements.folderNameInput) {
+      elements.folderNameInput.focus();
+      elements.folderNameInput.select();
+    }
+  }
+
+  // Request Rename Modal
+  function openRenameRequestModal(collectionId, requestId, currentName) {
+    if (elements.modalRenameReqTitle) elements.modalRenameReqTitle.textContent = 'Rename Request';
+    if (elements.renameRequestInput) elements.renameRequestInput.value = currentName || '';
+    state.pendingModalAction = async (name) => {
+      await window.apiForge.renameRequest(collectionId, requestId, name);
+      // Update any open tab corresponding to this request
+      state.tabs.forEach((t) => {
+        if (t.savedMeta && t.savedMeta.requestId === requestId) {
+          t.savedMeta.savedName = name;
+          t.title = name;
+        }
+      });
+      renderTabStrip();
+      updateBreadcrumb();
+      showToast(`Renamed request to "${name}"`, 'success');
+      await loadCollectionsTree();
+    };
+    openModal(elements.modalRenameRequest);
+    if (elements.renameRequestInput) {
+      elements.renameRequestInput.focus();
+      elements.renameRequestInput.select();
+    }
+  }
+
+  // Delete Confirm Modal
+  function openDeleteConfirmModal({ title, message, onConfirm }) {
+    if (elements.modalDelTitle) elements.modalDelTitle.textContent = title || 'Confirm Deletion';
+    if (elements.deleteConfirmMessage) elements.deleteConfirmMessage.textContent = message || 'Are you sure you want to delete this item?';
+    state.pendingModalAction = onConfirm;
+    openModal(elements.modalDelete);
   }
 
   // ==========================================================================
@@ -1016,6 +1919,7 @@
           elements.selectMethod.setAttribute('data-method', tab.method);
           renderTabStrip();
           renderBodyEditor();
+          updateUnsavedIndicator();
         }
       });
     }
@@ -1032,6 +1936,7 @@
             renderParamsTable();
           }
           updateTabTitle(tab);
+          updateUnsavedIndicator();
         }
       });
     }
@@ -1105,8 +2010,9 @@
           tab.body = e.target.value;
           validateBodyJson(tab.body);
           if (elements.bodyActiveDot) {
-            elements.bodyActiveDot.hidden = !tab.body.trim();
+            elements.bodyActiveDot.hidden = !tab.body.trim() || tab.method === 'GET' || tab.method === 'HEAD';
           }
+          updateUnsavedIndicator();
         }
       });
     }
@@ -1116,47 +2022,44 @@
     if (elements.btnValidateJson) {
       elements.btnValidateJson.addEventListener('click', () => {
         const tab = getActiveTab();
-        const res = validateBodyJson(tab ? tab.body : '');
-        if (res.empty) showToast('Request body is empty', 'info');
-        else if (res.valid) showToast('Valid JSON syntax', 'success');
-        else showToast('JSON Error: ' + res.error, 'error');
+        if (tab) {
+          const isValid = validateBodyJson(tab.body);
+          if (isValid) showToast('JSON is valid', 'success');
+          else showToast('JSON contains syntax errors', 'error');
+        }
       });
     }
     if (elements.btnCopyBody) {
       elements.btnCopyBody.addEventListener('click', () => {
         const tab = getActiveTab();
-        if (tab && tab.body) copyText(tab.body, 'Copied Request Body');
-        else showToast('No request body to copy', 'info');
-      });
-    }
-    if (elements.btnClearBody) {
-      elements.btnClearBody.addEventListener('click', () => {
-        const tab = getActiveTab();
-        if (tab) {
-          tab.body = '';
-          if (elements.inputBodyText) elements.inputBodyText.value = '';
-          validateBodyJson('');
-          if (elements.bodyActiveDot) elements.bodyActiveDot.hidden = true;
-          showToast('Request body cleared', 'info');
+        if (tab && tab.body) {
+          copyText(tab.body, 'Copied body to clipboard');
+        } else {
+          showToast('No body to copy', 'info');
         }
       });
     }
+    if (elements.btnClearBody) {
+      elements.btnClearBody.addEventListener('click', clearBodyJson);
+    }
 
-    // 9. Response Tabs
+    // 9. Response Sub-tabs
     elements.respTabButtons.forEach((btn) => {
       btn.addEventListener('click', () => {
-        const resptab = btn.getAttribute('data-resptab');
-        switchResponseSubtab(resptab);
+        const tabName = btn.getAttribute('data-resp-tab');
+        switchResponseSubtab(tabName);
       });
     });
 
-    // 10. Pretty / Raw Mode Toggles
+    // 10. Response Body Modes (Pretty vs Raw)
     if (elements.btnModePretty) {
       elements.btnModePretty.addEventListener('click', () => {
         const tab = getActiveTab();
         if (tab) {
           tab.bodyViewMode = 'pretty';
-          if (tab.response) renderSuccessResponse(tab.response, 'pretty', tab.responseSubtab);
+          elements.btnModePretty.className = 'btn-view-mode active';
+          if (elements.btnModeRaw) elements.btnModeRaw.className = 'btn-view-mode';
+          if (tab.response) renderResponseBody(tab.response, 'pretty');
         }
       });
     }
@@ -1165,7 +2068,9 @@
         const tab = getActiveTab();
         if (tab) {
           tab.bodyViewMode = 'raw';
-          if (tab.response) renderSuccessResponse(tab.response, 'raw', tab.responseSubtab);
+          elements.btnModeRaw.className = 'btn-view-mode active';
+          if (elements.btnModePretty) elements.btnModePretty.className = 'btn-view-mode';
+          if (tab.response) renderResponseBody(tab.response, 'raw');
         }
       });
     }
@@ -1193,7 +2098,119 @@
       });
     }
 
-    // 12. Navigation Buttons (Phase tags)
+    // 12. Save & Save As Buttons
+    if (elements.btnSaveRequest) {
+      elements.btnSaveRequest.addEventListener('click', handleSaveRequest);
+    }
+    if (elements.btnSaveAsRequest) {
+      elements.btnSaveAsRequest.addEventListener('click', openSaveModal);
+    }
+
+    // 13. Create Collection Header Button
+    if (elements.btnCreateCollection) {
+      elements.btnCreateCollection.addEventListener('click', openCreateCollectionModal);
+    }
+
+    // 14. Modals - Backdrop & Close Buttons
+    if (elements.modalBackdrop) {
+      elements.modalBackdrop.addEventListener('click', closeActiveModal);
+    }
+    if (elements.btnCloseSaveModal) {
+      elements.btnCloseSaveModal.addEventListener('click', closeActiveModal);
+    }
+    if (elements.btnCancelSaveModal) {
+      elements.btnCancelSaveModal.addEventListener('click', closeActiveModal);
+    }
+    if (elements.btnConfirmSaveModal) {
+      elements.btnConfirmSaveModal.addEventListener('click', handleConfirmSaveModal);
+    }
+    if (elements.saveTargetCollection) {
+      elements.saveTargetCollection.addEventListener('change', () => updateSaveModalFolders());
+    }
+
+    // Collection Modal
+    if (elements.btnCloseColModal) elements.btnCloseColModal.addEventListener('click', closeActiveModal);
+    if (elements.btnCancelColModal) elements.btnCancelColModal.addEventListener('click', closeActiveModal);
+    if (elements.btnConfirmColModal) {
+      elements.btnConfirmColModal.addEventListener('click', async () => {
+        const name = elements.collectionNameInput ? elements.collectionNameInput.value.trim() : '';
+        if (!name) {
+          showToast('Please enter a collection name', 'error');
+          if (elements.collectionNameInput) elements.collectionNameInput.focus();
+          return;
+        }
+        if (typeof state.pendingModalAction === 'function') {
+          try {
+            await state.pendingModalAction(name);
+            closeActiveModal();
+          } catch (err) {
+            showToast('Error: ' + err.message, 'error');
+          }
+        }
+      });
+    }
+
+    // Folder Modal
+    if (elements.btnCloseFldModal) elements.btnCloseFldModal.addEventListener('click', closeActiveModal);
+    if (elements.btnCancelFldModal) elements.btnCancelFldModal.addEventListener('click', closeActiveModal);
+    if (elements.btnConfirmFldModal) {
+      elements.btnConfirmFldModal.addEventListener('click', async () => {
+        const name = elements.folderNameInput ? elements.folderNameInput.value.trim() : '';
+        if (!name) {
+          showToast('Please enter a folder name', 'error');
+          if (elements.folderNameInput) elements.folderNameInput.focus();
+          return;
+        }
+        if (typeof state.pendingModalAction === 'function') {
+          try {
+            await state.pendingModalAction(name);
+            closeActiveModal();
+          } catch (err) {
+            showToast('Error: ' + err.message, 'error');
+          }
+        }
+      });
+    }
+
+    // Request Rename Modal
+    if (elements.btnCloseRenameReqModal) elements.btnCloseRenameReqModal.addEventListener('click', closeActiveModal);
+    if (elements.btnCancelRenameReqModal) elements.btnCancelRenameReqModal.addEventListener('click', closeActiveModal);
+    if (elements.btnConfirmRenameReqModal) {
+      elements.btnConfirmRenameReqModal.addEventListener('click', async () => {
+        const name = elements.renameRequestInput ? elements.renameRequestInput.value.trim() : '';
+        if (!name) {
+          showToast('Please enter a request name', 'error');
+          if (elements.renameRequestInput) elements.renameRequestInput.focus();
+          return;
+        }
+        if (typeof state.pendingModalAction === 'function') {
+          try {
+            await state.pendingModalAction(name);
+            closeActiveModal();
+          } catch (err) {
+            showToast('Error: ' + err.message, 'error');
+          }
+        }
+      });
+    }
+
+    // Delete Confirm Modal
+    if (elements.btnCloseDelModal) elements.btnCloseDelModal.addEventListener('click', closeActiveModal);
+    if (elements.btnCancelDelModal) elements.btnCancelDelModal.addEventListener('click', closeActiveModal);
+    if (elements.btnConfirmDelModal) {
+      elements.btnConfirmDelModal.addEventListener('click', async () => {
+        if (typeof state.pendingModalAction === 'function') {
+          try {
+            await state.pendingModalAction();
+            closeActiveModal();
+          } catch (err) {
+            showToast('Delete error: ' + err.message, 'error');
+          }
+        }
+      });
+    }
+
+    // 15. Navigation Buttons (Phase tags)
     elements.navButtons.forEach((btn) => {
       btn.addEventListener('click', () => {
         const feat = btn.getAttribute('data-feature') || 'Feature';
@@ -1202,15 +2219,36 @@
       });
     });
 
-    // 13. Keyboard Shortcuts (Ctrl+N, Ctrl+Enter)
+    // 16. Keyboard Shortcuts (Ctrl+S, Ctrl+N, Ctrl+Enter, Esc)
     window.addEventListener('keydown', (e) => {
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'n') {
+      if (e.key === 'Escape' && state.activeModal) {
+        e.preventDefault();
+        closeActiveModal();
+      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
+        e.preventDefault();
+        handleSaveRequest();
+      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'n') {
         e.preventDefault();
         createTab();
         showToast('Created new request tab', 'info');
       } else if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
-        e.preventDefault();
-        executeSend();
+        if (state.activeModal) {
+          // Trigger confirm button of active modal
+          if (state.activeModal === elements.modalSaveRequest && elements.btnConfirmSaveModal) {
+            elements.btnConfirmSaveModal.click();
+          } else if (state.activeModal === elements.modalCollection && elements.btnConfirmColModal) {
+            elements.btnConfirmColModal.click();
+          } else if (state.activeModal === elements.modalFolder && elements.btnConfirmFldModal) {
+            elements.btnConfirmFldModal.click();
+          } else if (state.activeModal === elements.modalRenameRequest && elements.btnConfirmRenameReqModal) {
+            elements.btnConfirmRenameReqModal.click();
+          } else if (state.activeModal === elements.modalDelete && elements.btnConfirmDelModal) {
+            elements.btnConfirmDelModal.click();
+          }
+        } else {
+          e.preventDefault();
+          executeSend();
+        }
       }
     });
   }
@@ -1223,5 +2261,6 @@
     initializeBridge();
     createTab({ title: 'New Request', method: 'GET', url: '' });
     bindEvents();
+    loadCollectionsTree();
   });
 })();

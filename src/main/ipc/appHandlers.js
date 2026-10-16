@@ -1,7 +1,8 @@
-﻿const path = require('path');
+const path = require('path');
 const fs = require('fs');
 const { clipboard } = require('electron');
 const { executeHttpRequest, cancelHttpRequest } = require('../http/httpClient');
+const collectionsStorage = require('../storage/collectionsStorage');
 
 /**
  * Validates any optional arguments supplied to the getAppInfo IPC channel.
@@ -110,6 +111,9 @@ function registerAppHandlers(ipcMain, appInstance) {
     throw new Error('Valid ipcMain instance must be provided');
   }
 
+  // Ensure storage is initialized
+  collectionsStorage.initStorage();
+
   // 1. App Info Channel
   ipcMain.handle('app:get-info', async (event, args) => {
     return handleGetAppInfo(appInstance, args);
@@ -132,7 +136,6 @@ function registerAppHandlers(ipcMain, appInstance) {
     if (!payload || typeof payload.text !== 'string') {
       throw new TypeError('Clipboard text payload must be a string');
     }
-    // Limit clipboard copy size to 10 MiB to prevent denial-of-service
     if (payload.text.length > 10 * 1024 * 1024) {
       throw new RangeError('Text exceeds maximum copy buffer limit of 10 MiB');
     }
@@ -142,6 +145,79 @@ function registerAppHandlers(ipcMain, appInstance) {
       return { success: true };
     }
     return { success: false, reason: 'Clipboard API unavailable' };
+  });
+
+  // =========================================================================
+  // Collections & Folders Storage Channels (Step 3)
+  // =========================================================================
+
+  ipcMain.handle('collections:get-tree', async () => {
+    return collectionsStorage.getCollectionsTree();
+  });
+
+  ipcMain.handle('collections:create-collection', async (event, payload) => {
+    const name = payload && typeof payload.name === 'string' ? payload.name : '';
+    return collectionsStorage.createCollection(name);
+  });
+
+  ipcMain.handle('collections:rename-collection', async (event, payload) => {
+    const { collectionId, name } = payload || {};
+    return collectionsStorage.renameCollection(collectionId, name);
+  });
+
+  ipcMain.handle('collections:delete-collection', async (event, payload) => {
+    const { collectionId } = payload || {};
+    return collectionsStorage.deleteCollection(collectionId);
+  });
+
+  ipcMain.handle('collections:duplicate-collection', async (event, payload) => {
+    const { collectionId } = payload || {};
+    return collectionsStorage.duplicateCollection(collectionId);
+  });
+
+  ipcMain.handle('collections:create-folder', async (event, payload) => {
+    const { collectionId, parentFolderId, name } = payload || {};
+    return collectionsStorage.createFolder(collectionId, parentFolderId, name);
+  });
+
+  ipcMain.handle('collections:rename-folder', async (event, payload) => {
+    const { collectionId, folderId, name } = payload || {};
+    return collectionsStorage.renameFolder(collectionId, folderId, name);
+  });
+
+  ipcMain.handle('collections:delete-folder', async (event, payload) => {
+    const { collectionId, folderId } = payload || {};
+    return collectionsStorage.deleteFolder(collectionId, folderId);
+  });
+
+  ipcMain.handle('collections:duplicate-folder', async (event, payload) => {
+    const { collectionId, folderId } = payload || {};
+    return collectionsStorage.duplicateFolder(collectionId, folderId);
+  });
+
+  ipcMain.handle('collections:save-request', async (event, payload) => {
+    const { collectionId, folderId, requestData, request, requestId } = payload || {};
+    return collectionsStorage.saveRequest(collectionId, folderId, requestData || request, requestId);
+  });
+
+  ipcMain.handle('collections:get-request', async (event, payload) => {
+    const { collectionId, requestId } = payload || {};
+    return collectionsStorage.getRequest(collectionId, requestId);
+  });
+
+  ipcMain.handle('collections:rename-request', async (event, payload) => {
+    const { collectionId, requestId, name } = payload || {};
+    return collectionsStorage.renameRequest(collectionId, requestId, name);
+  });
+
+  ipcMain.handle('collections:delete-request', async (event, payload) => {
+    const { collectionId, requestId } = payload || {};
+    return collectionsStorage.deleteRequest(collectionId, requestId);
+  });
+
+  ipcMain.handle('collections:duplicate-request', async (event, payload) => {
+    const { collectionId, requestId } = payload || {};
+    return collectionsStorage.duplicateRequest(collectionId, requestId);
   });
 }
 

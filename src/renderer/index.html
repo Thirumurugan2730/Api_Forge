@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
@@ -38,26 +38,35 @@
         </button>
       </div>
 
+      <!-- Collections Explorer Section (Step 3) -->
+      <div class="sidebar-collections-section">
+        <div class="collections-header">
+          <span class="nav-section-title">COLLECTIONS</span>
+          <button id="btn-create-collection" class="btn-icon-xs" title="Create Collection" aria-label="Create Collection">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <line x1="12" y1="5" x2="12" y2="19"></line>
+              <line x1="5" y1="12" x2="19" y2="12"></line>
+            </svg>
+          </button>
+        </div>
+
+        <div id="collections-tree-view" class="collections-tree-view" role="tree" aria-label="Collections and Saved Requests">
+          <!-- Dynamically populated collection/folder/request tree -->
+        </div>
+      </div>
+
+      <!-- Secondary Navigation -->
       <nav class="sidebar-nav">
         <div class="nav-section-title">WORKSPACE</div>
         <ul class="nav-list">
           <li class="nav-item">
-            <button class="nav-btn" data-feature="Collections" data-step="Step 3" id="nav-collections">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
-              </svg>
-              <span>Collections</span>
-              <span class="tag-deferred">Step 3</span>
-            </button>
-          </li>
-          <li class="nav-item">
-            <button class="nav-btn" data-feature="History" data-step="Step 3" id="nav-history">
+            <button class="nav-btn" data-feature="History" data-step="Step 4" id="nav-history">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <circle cx="12" cy="12" r="10"></circle>
                 <polyline points="12 6 12 12 16 14"></polyline>
               </svg>
               <span>History</span>
-              <span class="tag-deferred">Step 3</span>
+              <span class="tag-deferred">Step 4</span>
             </button>
           </li>
           <li class="nav-item">
@@ -93,8 +102,8 @@
             <span id="label-app-version" class="runtime-value">v0.1.0</span>
           </div>
           <div class="runtime-line">
-            <span class="runtime-label">Engine:</span>
-            <span id="bridge-status-pill" class="badge-status checking">HTTP Ready</span>
+            <span class="runtime-label">Storage:</span>
+            <span id="bridge-status-pill" class="badge-status connected">Collections Active</span>
           </div>
         </div>
       </div>
@@ -108,7 +117,9 @@
           <div class="workspace-crumb">
             <span class="crumb-root">Default Workspace</span>
             <span class="crumb-separator">/</span>
-            <span class="crumb-current">Spring Boot APIs</span>
+            <span id="crumb-active-collection" class="crumb-root">Collections</span>
+            <span class="crumb-separator">/</span>
+            <span id="crumb-active-request" class="crumb-current">New Request</span>
           </div>
         </div>
 
@@ -122,7 +133,7 @@
         <div class="toolbar-right">
           <div id="main-status-indicator" class="main-status-chip online" title="Status of the Electron Main Process Bridge">
             <span class="status-indicator-dot"></span>
-            <span id="status-indicator-text">HTTP Engine: Active</span>
+            <span id="status-indicator-text">ApiForge: Online</span>
           </div>
         </div>
       </header>
@@ -179,6 +190,25 @@
           </div>
 
           <div class="action-buttons-wrapper">
+            <!-- Save Button (Step 3) -->
+            <button id="btn-save-request" class="btn btn-secondary btn-save" title="Save Request to Collection (Ctrl+S)">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
+                <polyline points="17 21 17 13 7 13 7 21"></polyline>
+                <polyline points="7 3 7 8 15 8"></polyline>
+              </svg>
+              <span>Save</span>
+              <span id="save-indicator-dot" class="unsaved-dot" title="Unsaved changes" hidden></span>
+            </button>
+
+            <button id="btn-save-as-request" class="btn btn-secondary btn-xs-icon" title="Save As New Request">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+              </svg>
+            </button>
+
+            <!-- Send Button -->
             <button id="btn-send" class="btn btn-send" title="Execute HTTP Request (Ctrl+Enter)">
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                 <line x1="22" y1="2" x2="11" y2="13"></line>
@@ -187,6 +217,7 @@
               <span id="btn-send-label">Send</span>
             </button>
 
+            <!-- Cancel Button -->
             <button id="btn-cancel" class="btn btn-cancel" title="Cancel in-flight request" hidden>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
                 <rect x="4" y="4" width="16" height="16" rx="2"></rect>
@@ -384,7 +415,7 @@
             <h3 class="empty-state-title">No response yet</h3>
             <p class="empty-state-desc">Configure a request and send it to see the response.</p>
             <div class="empty-state-hint">
-              <span class="hint-pill">HTTP Engine Ready (GET, POST, PUT, PATCH, DELETE, HEAD, OPTIONS)</span>
+              <span class="hint-pill">HTTP Engine Ready · Collections Persistence Active</span>
             </div>
           </div>
 
@@ -497,6 +528,114 @@
         </div>
       </section>
     </main>
+  </div>
+
+  <!-- ======================================================================= -->
+  <!-- MODALS & DIALOGS (Step 3: Collections & Folders)                         -->
+  <!-- ======================================================================= -->
+
+  <!-- Modal Backdrop -->
+  <div id="modal-backdrop" class="modal-backdrop" hidden></div>
+
+  <!-- 1. Save Request Modal -->
+  <div id="modal-save-request" class="modal-card" role="dialog" aria-labelledby="modal-save-title" hidden>
+    <div class="modal-header">
+      <h3 id="modal-save-title">Save Request</h3>
+      <button class="btn-modal-close" id="btn-close-save-modal" aria-label="Close dialog">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label for="save-request-name" class="form-label">Request Name</label>
+        <input type="text" id="save-request-name" class="form-input" placeholder="e.g. Get User Profile">
+      </div>
+      <div class="form-group">
+        <label for="save-target-collection" class="form-label">Select Collection</label>
+        <select id="save-target-collection" class="form-select">
+          <!-- Populated dynamically -->
+        </select>
+      </div>
+      <div class="form-group">
+        <label for="save-target-folder" class="form-label">Select Folder (Optional)</label>
+        <select id="save-target-folder" class="form-select">
+          <option value="">Root (No Folder)</option>
+          <!-- Populated dynamically -->
+        </select>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary btn-sm" id="btn-cancel-save-modal">Cancel</button>
+      <button class="btn btn-primary btn-sm" id="btn-confirm-save-modal">Save Request</button>
+    </div>
+  </div>
+
+  <!-- 2. Create / Rename Collection Modal -->
+  <div id="modal-collection" class="modal-card" role="dialog" aria-labelledby="modal-col-title" hidden>
+    <div class="modal-header">
+      <h3 id="modal-col-title">Create Collection</h3>
+      <button class="btn-modal-close" id="btn-close-col-modal">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label for="collection-name-input" class="form-label">Collection Name</label>
+        <input type="text" id="collection-name-input" class="form-input" placeholder="e.g. Auth Service APIs">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary btn-sm" id="btn-cancel-col-modal">Cancel</button>
+      <button class="btn btn-primary btn-sm" id="btn-confirm-col-modal">Save</button>
+    </div>
+  </div>
+
+  <!-- 3. Create / Rename Folder Modal -->
+  <div id="modal-folder" class="modal-card" role="dialog" aria-labelledby="modal-fld-title" hidden>
+    <div class="modal-header">
+      <h3 id="modal-fld-title">Create Folder</h3>
+      <button class="btn-modal-close" id="btn-close-fld-modal">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label for="folder-name-input" class="form-label">Folder Name</label>
+        <input type="text" id="folder-name-input" class="form-input" placeholder="e.g. User Management">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary btn-sm" id="btn-cancel-fld-modal">Cancel</button>
+      <button class="btn btn-primary btn-sm" id="btn-confirm-fld-modal">Save</button>
+    </div>
+  </div>
+
+  <!-- 4. Rename Request Modal -->
+  <div id="modal-rename-request" class="modal-card" role="dialog" aria-labelledby="modal-rename-req-title" hidden>
+    <div class="modal-header">
+      <h3 id="modal-rename-req-title">Rename Request</h3>
+      <button class="btn-modal-close" id="btn-close-rename-req-modal">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label for="rename-request-input" class="form-label">Request Name</label>
+        <input type="text" id="rename-request-input" class="form-input" placeholder="Enter request name">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary btn-sm" id="btn-cancel-rename-req-modal">Cancel</button>
+      <button class="btn btn-primary btn-sm" id="btn-confirm-rename-req-modal">Rename</button>
+    </div>
+  </div>
+
+  <!-- 5. Delete Confirmation Modal -->
+  <div id="modal-delete" class="modal-card" role="dialog" aria-labelledby="modal-del-title" hidden>
+    <div class="modal-header">
+      <h3 id="modal-del-title">Confirm Deletion</h3>
+      <button class="btn-modal-close" id="btn-close-del-modal">&times;</button>
+    </div>
+    <div class="modal-body">
+      <p id="delete-confirm-message" class="delete-confirm-msg">Are you sure you want to delete this item?</p>
+      <p class="delete-warning-sub">This operation is permanent and cannot be undone.</p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary btn-sm" id="btn-cancel-del-modal">Cancel</button>
+      <button class="btn btn-danger btn-sm" id="btn-confirm-del-modal">Delete Permanently</button>
+    </div>
   </div>
 
   <script src="scripts/renderer.js"></script>

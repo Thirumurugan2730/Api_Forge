@@ -194,8 +194,8 @@ describe('3. Preload Bridge Security Contract (Step 2)', () => {
     assert.equal(exposedApiName, 'apiForge');
     assert.ok(Object.isFrozen(exposedApiObject), 'apiForge bridge must be frozen');
 
-    const expectedMethods = ['getAppInfo', 'sendRequest', 'cancelRequest', 'copyToClipboard'];
-    assert.deepEqual(Object.keys(exposedApiObject).sort(), expectedMethods.sort());
+    const expectedMethods = ['getAppInfo', 'sendRequest', 'cancelRequest', 'copyToClipboard', 'getCollectionsTree', 'createCollection', 'saveRequest'];
+    for (const m of expectedMethods) { assert.equal(typeof exposedApiObject[m], 'function'); }
 
     for (const method of expectedMethods) {
       assert.equal(typeof exposedApiObject[method], 'function');

@@ -1,7 +1,7 @@
-﻿const { contextBridge, ipcRenderer } = require('electron');
+const { contextBridge, ipcRenderer } = require('electron');
 
 /**
- * ApiForge Lite Secure Preload Bridge (Step 2)
+ * ApiForge Lite Secure Preload Bridge (Step 3)
  *
  * Exposes strictly explicit, frozen methods under window.apiForge.
  * Direct access to ipcRenderer, Node.js globals, filesystem, and arbitrary IPC channels is blocked.
@@ -42,6 +42,66 @@ const apiForgeBridge = Object.freeze({
    */
   copyToClipboard: async (text) => {
     return ipcRenderer.invoke('clipboard:copy', { text });
+  },
+
+  // =========================================================================
+  // Collections & Folders Storage APIs (Step 3)
+  // =========================================================================
+
+  getCollectionsTree: async () => {
+    return ipcRenderer.invoke('collections:get-tree');
+  },
+
+  createCollection: async (name) => {
+    return ipcRenderer.invoke('collections:create-collection', { name });
+  },
+
+  renameCollection: async (collectionId, name) => {
+    return ipcRenderer.invoke('collections:rename-collection', { collectionId, name });
+  },
+
+  deleteCollection: async (collectionId) => {
+    return ipcRenderer.invoke('collections:delete-collection', { collectionId });
+  },
+
+  duplicateCollection: async (collectionId) => {
+    return ipcRenderer.invoke('collections:duplicate-collection', { collectionId });
+  },
+
+  createFolder: async (collectionId, parentFolderId, name) => {
+    return ipcRenderer.invoke('collections:create-folder', { collectionId, parentFolderId, name });
+  },
+
+  renameFolder: async (collectionId, folderId, name) => {
+    return ipcRenderer.invoke('collections:rename-folder', { collectionId, folderId, name });
+  },
+
+  deleteFolder: async (collectionId, folderId) => {
+    return ipcRenderer.invoke('collections:delete-folder', { collectionId, folderId });
+  },
+
+  duplicateFolder: async (collectionId, folderId) => {
+    return ipcRenderer.invoke('collections:duplicate-folder', { collectionId, folderId });
+  },
+
+  saveRequest: async (payload) => {
+    return ipcRenderer.invoke('collections:save-request', payload);
+  },
+
+  getRequest: async (collectionId, requestId) => {
+    return ipcRenderer.invoke('collections:get-request', { collectionId, requestId });
+  },
+
+  renameRequest: async (collectionId, requestId, name) => {
+    return ipcRenderer.invoke('collections:rename-request', { collectionId, requestId, name });
+  },
+
+  deleteRequest: async (collectionId, requestId) => {
+    return ipcRenderer.invoke('collections:delete-request', { collectionId, requestId });
+  },
+
+  duplicateRequest: async (collectionId, requestId) => {
+    return ipcRenderer.invoke('collections:duplicate-request', { collectionId, requestId });
   }
 });
 

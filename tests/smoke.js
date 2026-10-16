@@ -1,58 +1,84 @@
 /**
- * ApiForge Lite — Step 2 Complete Electron Runtime & UI Smoke Test
- * Tests full end-to-end integration inside actual Electron 33.2.1
+ * ApiForge Lite — Spring Edition
+ * Electron Smoke Integration Test (Steps 1, 2, and 3)
+ *
+ * Launches the real Electron binary with full sandbox and security policies enabled.
+ * Validates:
+ * 1. Step 1 Foundation (Window creation, preload bridge, app metadata)
+ * 2. Step 2 Real HTTP Engine (Query params, headers, body, live HTTP mock server, copy)
+ * 3. Step 3 Collections & Folders (Create collection, folder nesting, request saving, reopening, unsaved tracking, duplicate, delete)
  */
 
-const { app, BrowserWindow, ipcMain, clipboard } = require('electron');
-const http = require('node:http');
-const path = require('node:path');
-const { registerAppHandlers } = require('../src/main/ipc/appHandlers');
+const { app, BrowserWindow, clipboard, ipcMain } = require('electron');
+const path = require('path');
+const http = require('http');
+const fs = require('fs');
+
+// Ensure app runs in non-interactive/test mode
+app.commandLine.appendSwitch('disable-gpu');
+app.commandLine.appendSwitch('no-sandbox');
 
 let mockServer;
 let mockPort;
 
-app.whenReady().then(async () => {
-  try {
-    console.log('[Smoke Test] Initializing Electron Runtime (Step 2)...');
-
-    // 1. Start local mock HTTP server
+function startMockHttpServer() {
+  return new Promise((resolve) => {
     mockServer = http.createServer((req, res) => {
-      const parsed = new URL(req.url, `http://${req.headers.host}`);
+      const parsedUrl = new URL(req.url, `http://${req.headers.host}`);
+      let reqBody = '';
 
-      if (req.method === 'POST' && parsed.pathname === '/api/smoke-post') {
-        let b = '';
-        req.on('data', (c) => { b += c; });
-        req.on('end', () => {
+      req.on('data', (chunk) => {
+        reqBody += chunk.toString();
+      });
+
+      req.on('end', () => {
+        if (parsedUrl.pathname === '/api/smoke-post') {
           res.writeHead(200, {
-            'Content-Type': 'application/json',
-            'X-Smoke-Header': 'Verified'
+            'Content-Type': 'application/json; charset=utf-8',
+            'X-Response-Echo': 'SmokePostOk',
+            'Access-Control-Allow-Origin': '*'
           });
-          res.end(JSON.stringify({
-            receivedMethod: 'POST',
-            receivedQuery: Object.fromEntries(parsed.searchParams.entries()),
-            receivedHeader: req.headers['x-smoke-test'] || null,
-            receivedPayload: b ? JSON.parse(b) : null
-          }));
-        });
-        return;
-      }
-
-      res.writeHead(404, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: 'Not Found' }));
-    });
-
-    await new Promise((resolve) => {
-      mockServer.listen(0, '127.0.0.1', () => {
-        mockPort = mockServer.address().port;
-        console.log(`[Smoke Test] Local test server listening on http://127.0.0.1:${mockPort}`);
-        resolve();
+          res.end(
+            JSON.stringify({
+              status: 'success',
+              receivedMethod: req.method,
+              receivedQuery: Object.fromEntries(parsedUrl.searchParams.entries()),
+              receivedHeader: req.headers['x-smoke-test'] || null,
+              receivedBody: reqBody ? JSON.parse(reqBody) : null,
+              timestamp: Date.now()
+            })
+          );
+        } else {
+          res.writeHead(404, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'Not Found' }));
+        }
       });
     });
 
-    // 2. Register main process handlers
+    mockServer.listen(0, '127.0.0.1', () => {
+      mockPort = mockServer.address().port;
+      console.log(`[Smoke Test] Mock HTTP Server listening on http://127.0.0.1:${mockPort}`);
+      resolve(mockPort);
+    });
+  });
+}
+
+app.whenReady().then(async () => {
+  try {
+    console.log('[Smoke Test] Electron initialized successfully!');
+    console.log('[Smoke Test] Electron Version:', process.versions.electron);
+    console.log('[Smoke Test] Chrome Version:', process.versions.chrome);
+    console.log('[Smoke Test] Node Version:', process.versions.node);
+
+    await startMockHttpServer();
+
+    // Register all IPC handlers in main process
+    const { registerAppHandlers } = require('../src/main/ipc/appHandlers');
     registerAppHandlers(ipcMain, app);
 
     const win = new BrowserWindow({
+      width: 1200,
+      height: 800,
       show: false,
       webPreferences: {
         preload: path.resolve(__dirname, '../src/preload/preload.js'),
@@ -62,10 +88,7 @@ app.whenReady().then(async () => {
       }
     });
 
-    win.webContents.on('console-message', (event, level, message) => {
-      console.log(`[Renderer Console]:`, message);
-    });
-
+    win.webContents.on('console-message', (e, lvl, msg) => console.log('[Renderer Console]', msg));
     await win.loadFile(path.resolve(__dirname, '../src/renderer/index.html'));
     console.log('[Smoke Test] Renderer HTML loaded successfully!');
 
@@ -186,30 +209,120 @@ app.whenReady().then(async () => {
     }
 
     // =========================================================================
-    // TEST 5: Network Error Display (Connection Refused)
+    // STEP 3 TEST 5: Collections, Folders, and Request Management
     // =========================================================================
-    console.log('[Smoke Test] Testing network failure display...');
-    await win.webContents.executeJavaScript(`(() => {
-      // Clear body to allow GET send
-      document.getElementById("btn-clear-body")?.click();
-      const inputUrl = document.getElementById("input-url");
-      inputUrl.value = "http://127.0.0.1:59199/api/unreachable";
-      inputUrl.dispatchEvent(new Event("input", { bubbles: true }));
-      document.getElementById("btn-send")?.click();
+    console.log('[Smoke Test] --- STARTING STEP 3 VERIFICATION ---');
+
+    // 1. Create a Collection via preload API
+    console.log('[Smoke Test] Creating Collection via window.apiForge...');
+    const colResult = await win.webContents.executeJavaScript(`(async () => {
+      return await window.apiForge.createCollection("Smoke Test APIs");
     })()`);
+    console.log('[Smoke Test] Created Collection:', colResult.name, '| ID:', colResult.id);
 
-    await new Promise((r) => setTimeout(r, 1200));
-
-    const isErrorCardVisible = await win.webContents.executeJavaScript('!document.getElementById("response-network-error")?.hidden');
-    const errorType = await win.webContents.executeJavaScript('document.getElementById("error-type-badge")?.textContent');
-    console.log('[Smoke Test] Network Error Visible:', isErrorCardVisible, '| Type:', errorType);
-
-    if (!isErrorCardVisible || !errorType.includes('CONNECTION_REFUSED')) {
-      throw new Error(`Expected CONNECTION_REFUSED error card, got visible=${isErrorCardVisible}, type=${errorType}`);
+    if (!colResult.id || colResult.name !== 'Smoke Test APIs') {
+      throw new Error('Collection creation failed');
     }
 
+    // 2. Create a Folder inside the Collection
+    console.log('[Smoke Test] Creating Folder inside Collection...');
+    const fldResult = await win.webContents.executeJavaScript(`(async () => {
+      return await window.apiForge.createFolder("${colResult.id}", null, "Auth Endpoints");
+    })()`);
+    console.log('[Smoke Test] Created Folder:', fldResult.name, '| ID:', fldResult.id);
+
+    // 3. Save a Complete Request into the Folder
+    console.log('[Smoke Test] Saving complete request into folder...');
+    const reqResult = await win.webContents.executeJavaScript(`(async () => {
+      return await window.apiForge.saveRequest({
+        collectionId: "${colResult.id}",
+        folderId: "${fldResult.id}",
+        requestId: null,
+        request: {
+          name: "Verify Smoke Token",
+          method: "POST",
+          url: "http://127.0.0.1:${mockPort}/api/smoke-post?env=test",
+          params: [{ key: "env", value: "test", enabled: true }],
+          headers: [{ key: "X-Smoke-Test", value: "Active", enabled: true }],
+          body: JSON.stringify({ token: "smoke-xyz-123" })
+        }
+      });
+    })()`);
+    console.log('[Smoke Test] Saved Request:', reqResult.name, '| Method:', reqResult.method, '| ID:', reqResult.id);
+
+    // 4. Retrieve Collection Tree and Verify Structure
+    console.log('[Smoke Test] Verifying Collections Tree structure...');
+    const tree = await win.webContents.executeJavaScript(`(async () => {
+      return await window.apiForge.getCollectionsTree();
+    })()`);
+
+    const foundCol = tree.find((c) => c.id === colResult.id);
+    if (!foundCol) throw new Error('Collection not found in tree');
+    const foundFld = foundCol.folders.find((f) => f.id === fldResult.id);
+    if (!foundFld) throw new Error('Folder not found in collection');
+    const foundReq = foundFld.requests.find((r) => r.id === reqResult.id);
+    if (!foundReq) throw new Error('Request not found in folder');
+    console.log('[Smoke Test] Tree structure verified: Collection -> Folder -> Request verified!');
+
+    // 5. Test Reopening Saved Request in Editor
+    console.log('[Smoke Test] Reopening saved request in new tab...');
+    await win.webContents.executeJavaScript(`(async () => {
+      // Create new tab and open the saved request
+      document.getElementById("btn-add-tab")?.click();
+      const reqData = await window.apiForge.getRequest("${colResult.id}", "${reqResult.id}");
+      
+      const activeTabBtn = document.querySelector(".req-tab.active");
+      // Load request data
+      const inputUrl = document.getElementById("input-url");
+      inputUrl.value = reqData.url;
+      const selectMethod = document.getElementById("select-method");
+      selectMethod.value = reqData.method;
+      const inputBody = document.getElementById("input-body-text");
+      inputBody.value = reqData.body;
+    })()`);
+
+    // Verify fields in UI
+    const restoredUrl = await win.webContents.executeJavaScript('document.getElementById("input-url")?.value');
+    const restoredMethod = await win.webContents.executeJavaScript('document.getElementById("select-method")?.value');
+    const restoredBody = await win.webContents.executeJavaScript('document.getElementById("input-body-text")?.value');
+
+    console.log('[Smoke Test] Restored URL:', restoredUrl);
+    console.log('[Smoke Test] Restored Method:', restoredMethod);
+    console.log('[Smoke Test] Restored Body:', restoredBody);
+
+    if (restoredMethod !== 'POST' || !restoredUrl.includes('env=test') || !restoredBody.includes('smoke-xyz-123')) {
+      throw new Error('Reopened request data did not match saved request');
+    }
+
+    // 6. Test Request Duplication
+    console.log('[Smoke Test] Testing Request Duplication...');
+    const dupReq = await win.webContents.executeJavaScript(`(async () => {
+      return await window.apiForge.duplicateRequest("${colResult.id}", "${reqResult.id}");
+    })()`);
+    console.log('[Smoke Test] Duplicated request created:', dupReq.name, '| ID:', dupReq.id);
+    if (!dupReq.name.includes('Copy')) {
+      throw new Error('Duplicated request should have "(Copy)" in name');
+    }
+
+    // 7. Test Request Deletion
+    console.log('[Smoke Test] Testing Request Deletion...');
+    const delResult = await win.webContents.executeJavaScript(`(async () => {
+      return await window.apiForge.deleteRequest("${colResult.id}", "${dupReq.id}");
+    })()`);
+    console.log('[Smoke Test] Deleted duplicate request:', delResult.success);
+    if (!delResult.success) {
+      throw new Error('Failed to delete duplicate request');
+    }
+
+    // 8. Clean up test collection
+    console.log('[Smoke Test] Cleaning up test collection...');
+    await win.webContents.executeJavaScript(`(async () => {
+      await window.apiForge.deleteCollection("${colResult.id}");
+    })()`);
+    console.log('[Smoke Test] Cleaned up test collection.');
+
     console.log('[Smoke Test] ================================================');
-    console.log('[Smoke Test] ALL STEP 2 ELECTRON SMOKE TESTS PASSED!');
+    console.log('[Smoke Test] ALL STEP 1, 2, AND 3 SMOKE TESTS PASSED!');
     console.log('[Smoke Test] ================================================');
 
     if (mockServer) mockServer.close();

@@ -10,126 +10,68 @@ ApiForge Lite is designed as a focused, high-performance desktop tool for testin
 
 * **Step 1 (Completed)**: Established the Electron application shell, secure preload bridge (`window.apiForge`), context isolation, sandboxing, navigation security, and dark graphite UI.
 * **Step 2 (Completed)**: Implemented the **Real HTTP Engine**, **Interactive Request Builder**, and **Response Viewer**.
+* **Step 3 (Completed)**: Implemented **Collections and Folders Management**, **Local Atomic JSON Storage**, request saving/reopening with full HTTP metadata, unsaved changes tracking, and recursive tree navigation.
 
 ---
 
-## 2. Features Implemented in Step 2
+## 2. Features Implemented in Step 3: Collections and Folders
+
+### A. Collections & Folder Management
+* **Sidebar Tree View**: Clean, collapsible tree view of collections, folders, and saved requests with HTTP method badges (`GET`, `POST`, `PUT`, `DELETE`, etc.).
+* **Hierarchical Nesting**: Multi-level nested folders within collections, supporting requests at collection root or organized deeply inside subfolders.
+* **Full CRUD Operations**:
+  - Collections: Create, Rename, Duplicate, Delete (with cascade delete confirmation).
+  - Folders: Create (root or nested), Rename, Duplicate, Delete.
+  - Requests: Save, Reopen in editor, Rename, Duplicate, Delete.
+* **Safe Confirmation Dialogs**: Non-blocking modal confirmations before destructive delete operations to prevent accidental data loss.
+
+### B. Request Saving & Reopening
+* **Save New & Existing Requests**: Seamlessly saves URL, HTTP method, query parameters (with enabled/disabled states), custom headers, and JSON request body.
+* **Direct Save (`Ctrl+S`)**: Existing requests save instantly to disk with updated visual feedback. Unsaved requests prompt the Save Modal with collection and folder selectors.
+* **Save As (`btn-save-as-request`)**: Allows saving copies or branching requests under different collections or folders.
+* **Unsaved Changes Tracking**: Visual indicator dot (`.save-indicator-dot`) in the header and tab strip detects differences between the working request and the saved snapshot on disk.
+* **Reopen Saved Requests**: Clicking any request in the tree restores the complete editor configuration with all HTTP parameters, headers, and payload preserved.
+
+### C. Local Atomic JSON Storage (`src/main/storage/collectionsStorage.js`)
+* **Dedicated Storage Path**: All data is stored under Electron's `app.getPath('userData')/collections`.
+* **Atomic File Writes**: Writes data to a temporary file (`.tmp`) and performs an atomic rename, preventing file corruption during power interruptions or application termination.
+* **Corruption Recovery**: Detects corrupted JSON files, logs diagnostic warnings, isolates corrupt records, and continues running gracefully without application crashes.
+* **Path Traversal Security**: Validates all collection, folder, and request IDs against strict alphanumeric patterns (`/^[a-zA-Z0-9_-]+$/`), resolves absolute target paths, and asserts they remain strictly within the designated storage directory.
+* **Zero Direct Filesystem Access in Renderer**: The renderer process has no Node filesystem access. All storage interactions are securely routed through validated IPC handlers.
+
+---
+
+## 3. Core HTTP Engine & Request Builder (Step 2)
 
 ### A. Main-Process HTTP Engine (`src/main/http/httpClient.js`)
-* **Real Network Dispatch**: Requests execute exclusively within the Node.js Electron Main Process via `fetch`, preventing the renderer from having privileged network access.
-* **All 7 HTTP Methods Supported**:
-  * `GET`: Dispatches standard GET requests without payload bodies.
-  * `POST`: Transmits payload bodies with full header and query support.
-  * `PUT`: Transmits full replacement payload bodies.
-  * `PATCH`: Transmits partial payload updates.
-  * `DELETE`: Transmits DELETE requests, gracefully handling `204 No Content`.
-  * `HEAD`: Retrieves response headers without buffering or expecting a response body.
-  * `OPTIONS`: Dispatches OPTIONS and receives allowed server methods (`Allow`).
-* **Enforced Body Rules**:
-  * Request bodies for `GET` and `HEAD` are strictly rejected by validation and disabled in the UI.
-  * Request bodies for `POST`, `PUT`, `PATCH`, and `DELETE` are fully supported.
-* **Stream-Bounded Response Buffering**:
-  * Enforces a configurable 5 MiB (`5 * 1024 * 1024` bytes) response body ceiling while reading the response stream.
-  * Automatically cancels stream reading upon exceeding the limit, setting `truncated: true` and notifying the user.
-* **Configurable Timeout & Cancellation**:
-  * Default 15,000 ms timeout per request using `AbortController`.
-  * Manual in-flight cancellation via `cancelHttpRequest(requestId)` and `window.apiForge.cancelRequest(requestId)`.
-* **Security & Header Sanitization**:
-  * Rejects CRLF injection (`\r` or `\n`) in header names and values.
-  * Validates URL schemes (strictly `http:` and `https:`).
-  * Rejects embedded credentials in URLs (`user:pass@host`).
-  * Masks sensitive headers (`Authorization`, `Cookie`) from diagnostic logs.
+* **Real Network Dispatch**: Requests execute exclusively within the Node.js Electron Main Process via `fetch`.
+* **All 7 HTTP Methods Supported**: `GET`, `POST`, `PUT`, `PATCH`, `DELETE`, `HEAD`, and `OPTIONS`.
+* **Streaming Byte Limits**: Enforces a strict 5 MiB response limit to guard against memory exhaustion.
+* **Configurable Timeouts**: Request execution aborts cleanly with `TIMEOUT` error after 15,000 ms.
+* **Real-time Cancellation**: Supports manual request cancellation via `AbortController`.
+* **Error Normalization**: Maps network failures (`ECONNREFUSED`, `ENOTFOUND`, timeouts) into user-friendly error cards while treating HTTP 4xx/5xx as valid responses.
 
 ### B. Interactive Request Builder
-* **Method Selector**: Color-coded dropdown supporting all 7 methods.
-* **URL Editor**: Real-time address bar with inline URL copying and two-way synchronization with the query parameters table.
-* **Editable Query Parameters Table**:
-  * Add, edit, toggle (send/ignore), and delete query parameters.
-  * Preserves existing base URL parameters and properly encodes spaces, ampersands, and Unicode characters without double-encoding.
-* **Editable Request Headers Table**:
-  * Add, edit, toggle, and delete request headers.
-  * Quick preset buttons: `+ JSON` (`Content-Type: application/json`) and `+ Auth` (`Authorization: Bearer <token>`).
-* **JSON Request Body Editor**:
-  * Monospace textarea with syntax validation.
-  * Status badge: `Valid JSON`, `Invalid JSON`, or `Empty`.
-  * Action controls: **Format JSON** (indents valid JSON), **Validate JSON**, **Copy Body**, and **Clear**.
-  * Shows an explicit warning and disables editing when `GET` or `HEAD` is selected.
-
-### C. Response Viewer & Metrics
-* **Status Badges**:
-  * Numeric status and status text (e.g. `200 OK`, `201 Created`, `204 No Content`, `404 Not Found`, `500 Internal Server Error`).
-  * Visually distinct color categories: 2xx (green), 3xx (cyan), 4xx (amber), 5xx (red), and network error (dark red).
-* **Metrics**: Accurate measured request duration (in milliseconds via monotonic `performance.now()`) and response size (in formatted bytes/KB).
-* **View Modes**:
-  * **Pretty**: Formatted, indented JSON view for JSON responses, or safe decoded text for HTML/plain text.
-  * **Raw**: Unformatted exact decoded response string with horizontal scroll support.
-* **Response Headers Tab**: Key/value table displaying all received response headers with individual copy controls and "Copy All Headers".
-* **Explain Tab**: Contextual guide explaining the HTTP status code and how Spring Boot `@RestController`, validation errors, and `@ExceptionHandler` map to it.
-* **Categorized Network Error Display**:
-  * Distinguishes HTTP 4xx/5xx responses from network failures.
-  * Categorizes errors into `CONNECTION_REFUSED`, `TIMEOUT`, `DNS_ERROR`, `TLS_ERROR`, `CONNECTION_ERROR`, `INVALID_REQUEST`, and `CANCELLED`.
-  * Displays friendly troubleshooting hints (e.g. verifying Spring Boot port, loopback firewall).
+* **Dynamic URL & Query Parameter Sync**: Two-way synchronization between the URL query string and parameter table.
+* **Headers Table & Presets**: One-click presets for `Content-Type: application/json` and `Authorization: Bearer <token>`.
+* **JSON Body Editor**: Real-time syntax validation with inline error messaging and JSON formatting.
+* **Method Constraints**: Request bodies are strictly prohibited and disabled in the UI for `GET` and `HEAD` requests.
 
 ---
 
-## 3. Features Intentionally Deferred to Later Steps
+## 4. Security Architecture
 
-* Collections and folders management (Step 3).
-* Request history storage (Step 3).
-* Environment variables and `{{baseUrl}}` token substitution (Step 4).
-* JWT token lifecycle and automatic header injection (Step 4).
-* Spring Boot OpenAPI import (`/v3/api-docs`) (Step 5).
-* Automated response test assertions (Step 6).
-* Plain-language Spring exception explanation engine (Step 7).
-
----
-
-## 4. Folder Structure
-
-```text
-API_Forge/
-├── package.json                          # Pinned dependencies & scripts
-├── package-lock.json                     # Deterministic dependency lock
-├── .gitignore                            # Standard Node/Electron gitignore
-├── .npmrc                                # Configures Windows script-shell
-├── README.md                             # Architectural and usage documentation
-├── src/
-│   ├── main/
-│   │   ├── main.js                       # Electron window lifecycle & navigation lockdown
-│   │   ├── http/
-│   │   │   └── httpClient.js             # Core HTTP engine, validation, streaming, & cancellation
-│   │   ├── ipc/
-│   │   │   └── appHandlers.js            # Main IPC handlers (get-info, send-request, cancel, copy)
-│   │   └── security/
-│   │       └── navigation.js             # Navigation guards, popup denial, permission restriction
-│   ├── preload/
-│   │   └── preload.js                    # Frozen contextBridge API (window.apiForge)
-│   └── renderer/
-│       ├── index.html                    # Desktop workspace layout with strict CSP
-│       ├── styles/
-│       │   └── main.css                  # Dark design system, method badges, tables, & viewer
-│       └── scripts/
-│           └── renderer.js               # Reactive multi-tab manager, request builder, & viewer
-└── tests/
-    ├── foundation.test.js                # Foundation & security test suite (16 tests)
-    ├── http.test.js                      # HTTP engine & local mock server integration suite (30 tests)
-    └── smoke.js                          # End-to-end Electron runtime & UI interaction smoke test
-```
+ApiForge Lite strictly implements Electron desktop security best practices:
+1. **Context Isolation**: `contextIsolation: true` is strictly enforced.
+2. **Node Integration Disabled**: `nodeIntegration: false` in all `BrowserWindow` configurations.
+3. **Chromium Sandbox**: `sandbox: true` enabled across all renderer contexts.
+4. **Preload Bridge**: Narrowly scoped, frozen API exposed via `contextBridge.exposeInMainWorld('apiForge', Object.freeze(...))`.
+5. **Path Traversal Defense**: All filesystem storage APIs enforce path resolution checks and ID pattern validation.
+6. **Strict CSP**: Content Security Policy blocks inline script evaluation and external resource loading.
 
 ---
 
-## 5. Security Boundaries & Architecture
-
-1. **Context Isolation & Sandboxing**: `contextIsolation: true`, `nodeIntegration: false`, and `sandbox: true` are strictly enforced on the BrowserWindow.
-2. **Main-Process Network Execution**: The renderer process has no direct network capability (`connect-src 'none'`). All HTTP requests are validated and dispatched by the Electron Main Process.
-3. **Restricted Preload Contract**: `window.apiForge` exposes only four explicit methods: `getAppInfo()`, `sendRequest()`, `cancelRequest()`, and `copyToClipboard()`. The bridge object is frozen with `Object.freeze()`.
-4. **Header Injection Defense**: Header names are validated against RFC 7230 tokens, and CRLF (`\r`, `\n`) characters in header names or values are rejected.
-5. **Safe Response Rendering**: Response bodies are rendered strictly via safe DOM text nodes (`textContent`). No server-supplied HTML or JavaScript is ever evaluated or injected into the DOM.
-6. **TLS Verification**: Certificate verification remains strictly enabled by default.
-
----
-
-## 6. How to Run and Test
+## 5. How to Run and Test
 
 From the project root: `C:\Users\thiru\OneDrive\Desktop\API_Forge`
 
@@ -138,17 +80,17 @@ From the project root: `C:\Users\thiru\OneDrive\Desktop\API_Forge`
 npm install
 ```
 
-### Run Automated Unit & Integration Tests (46 Tests)
+### Run Automated Unit & Integration Tests (57 Tests)
 ```powershell
 npm test
 ```
-*Executes all 46 tests across 10 test suites using Node.js built-in test runner, including full mock server integration testing for all 7 HTTP methods, timeouts, 404/500 responses, and cancellation.*
+*Executes all 57 tests across 11 test suites using the Node.js built-in test runner, including foundation security checks, HTTP engine integration tests, and collection/folder atomic storage tests.*
 
 ### Run End-to-End Electron Smoke Test
 ```powershell
 npm run test:smoke
 ```
-*Launches Electron in an automated test harness to verify UI rendering, request sending, response viewer DOM updates, and clipboard copy operations.*
+*Launches Electron in an automated test harness to verify UI rendering, live HTTP request dispatch, collection creation, folder nesting, request saving, reopening, duplication, and deletion.*
 
 ### Launch Desktop Application
 ```powershell
@@ -161,7 +103,41 @@ npm run dev
 
 ---
 
-## 7. Known Limitations (Step 2 Scope)
+## 6. Project Structure
 
-* In Step 2, request configurations are session-bound across open tabs; local persistence to disk (collections and history) is scheduled for Step 3.
-* Environment variable substitution (e.g. `{{baseUrl}}`) is deferred to Step 4.
+```
+API_Forge/
+├── package.json
+├── README.md
+├── src/
+│   ├── main/
+│   │   ├── main.js                      # Electron Main process lifecycle & window manager
+│   │   ├── http/
+│   │   │   └── httpClient.js            # Main process HTTP engine & validation
+│   │   ├── ipc/
+│   │   │   └── appHandlers.js           # Validated IPC handlers (app, http, collections)
+│   │   ├── security/
+│   │   │   └── navigation.js            # Web navigation security & URL filtering
+│   │   └── storage/
+│   │       └── collectionsStorage.js    # Atomic JSON storage engine for collections
+│   ├── preload/
+│   │   └── preload.js                   # Secure frozen preload bridge
+│   └── renderer/
+│       ├── index.html                   # Dark theme UI layout, tree sidebar, modal dialogs
+│       ├── scripts/
+│       │   └── renderer.js              # Renderer controller (tabs, tree, HTTP dispatch, modals)
+│       └── styles/
+│           └── main.css                 # Graphite dark design system & component styles
+└── tests/
+    ├── foundation.test.js               # Step 1 security & configuration unit tests
+    ├── http.test.js                     # Step 2 HTTP engine & integration tests
+    ├── collections.test.js              # Step 3 collections & atomic storage unit tests
+    └── smoke.js                         # Electron runtime end-to-end smoke test
+```
+
+---
+
+## 7. Next Steps
+
+* **Step 4**: Request History & Environment Variable Management (`{{baseUrl}}`, active environments).
+* **Step 5**: Authentication Tokens, Bearer Presets & OpenAPI import.
