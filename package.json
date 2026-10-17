@@ -7,8 +7,10 @@
   "scripts": {
     "start": "electron .",
     "dev": "electron .",
-    "test": "node --test tests/foundation.test.js tests/http.test.js tests/collections.test.js tests/history_settings.test.js",
-    "test:smoke": "electron tests/smoke.js"
+    "test": "node --test tests/foundation.test.js tests/http.test.js tests/collections.test.js tests/history_settings.test.js tests/automated_testing.test.js tests/openapi_import.test.js tests/error_explainer.test.js tests/role_matrix.test.js",
+    "test:smoke": "electron tests/smoke.js",
+    "build": "electron-builder --win",
+    "dist": "electron-builder --win"
   },
   "keywords": [
     "electron",
@@ -20,6 +22,38 @@
   "author": "ApiForge Team",
   "license": "MIT",
   "devDependencies": {
-    "electron": "33.2.1"
+    "electron": "33.2.1",
+    "electron-builder": "^26.15.3"
+  },
+  "build": {
+    "appId": "com.apiforge.lite",
+    "productName": "ApiForge Lite",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "src/**/*",
+      "assets/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "assets/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "ApiForge Lite",
+      "uninstallDisplayName": "ApiForge Lite"
+    }
   }
 }

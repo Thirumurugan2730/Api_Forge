@@ -133,6 +133,50 @@ const apiForgeBridge = Object.freeze({
 
   resetSettings: async () => {
     return ipcRenderer.invoke('settings:reset');
+  },
+
+  // =========================================================================
+  // Automated API Testing APIs (Step 6)
+  // =========================================================================
+
+  evaluateTests: async (tests, response) => {
+    return ipcRenderer.invoke('tests:evaluate', tests, response);
+  },
+
+  // =========================================================================
+  // OpenAPI 3.x Import APIs (Step 7)
+  // =========================================================================
+
+  fetchOpenApiFromUrl: async (url) => {
+    return ipcRenderer.invoke('openapi:fetch-url', url);
+  },
+
+  openOpenApiFile: async () => {
+    return ipcRenderer.invoke('openapi:open-file');
+  },
+
+  parseOpenApiContent: async (content) => {
+    return ipcRenderer.invoke('openapi:parse-content', content);
+  },
+
+  importOpenApiEndpoints: async (payload) => {
+    return ipcRenderer.invoke('openapi:import-endpoints', payload);
+  },
+
+  // =========================================================================
+  // Spring Boot Error Explainer APIs (Step 8)
+  // =========================================================================
+
+  explainError: async (context) => {
+    return ipcRenderer.invoke('explainer:explain-error', context);
+  },
+
+  // =========================================================================
+  // Spring Security Role Testing Matrix APIs (Step 9)
+  // =========================================================================
+
+  runRoleMatrix: async (payload) => {
+    return ipcRenderer.invoke('roles:run-matrix', payload);
   }
 });
 

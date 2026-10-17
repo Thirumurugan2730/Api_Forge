@@ -13,3 +13,5 @@ yarn-error.log*
 Thumbs.db
 .idea/
 .vscode/
+.apiforge_storage/
+preview-server.js

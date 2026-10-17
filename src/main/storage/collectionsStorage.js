@@ -1,3 +1,4 @@
+const roleMatrixRunner = require('../roles/roleMatrixRunner');
 /**
  * ApiForge Lite — Spring Edition
  * Local Collections & Folders Storage Service (Step 3)
@@ -390,7 +391,8 @@ function duplicateCollection(collectionId) {
         url: r.url,
         params: r.params,
         headers: r.headers,
-        body: r.body
+        body: r.body,
+        tests: r.tests ? JSON.parse(JSON.stringify(r.tests)) : []
       });
     }
   }
@@ -520,7 +522,8 @@ function duplicateFolder(collectionId, folderId) {
           url: r.url,
           params: r.params,
           headers: r.headers,
-          body: r.body
+          body: r.body,
+          tests: r.tests ? JSON.parse(JSON.stringify(r.tests)) : []
         });
       }
     }
@@ -557,6 +560,8 @@ function saveRequest(collectionId, folderId, requestData, requestId) {
     params: Array.isArray(requestData.params) ? requestData.params : [],
     headers: Array.isArray(requestData.headers) ? requestData.headers : [],
     body: requestData.body || '',
+    tests: Array.isArray(requestData.tests) ? requestData.tests : (existing?.tests || []),
+    roleTesting: requestData.roleTesting && typeof requestData.roleTesting === 'object' ? roleMatrixRunner.sanitizeRoleConfigForPersistence(requestData.roleTesting) : (existing?.roleTesting || null),
     createdAt: existing?.createdAt || Date.now(),
     updatedAt: Date.now()
   };
@@ -605,7 +610,8 @@ function duplicateRequest(collectionId, requestId) {
     url: orig.url,
     params: orig.params,
     headers: orig.headers,
-    body: orig.body
+    body: orig.body,
+    tests: orig.tests ? JSON.parse(JSON.stringify(orig.tests)) : []
   });
 }
 

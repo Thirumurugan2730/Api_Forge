@@ -1,10 +1,14 @@
 ﻿const path = require('path');
 const fs = require('fs');
-const { clipboard } = require('electron');
+const { clipboard, dialog } = require('electron');
 const { executeHttpRequest, cancelHttpRequest } = require('../http/httpClient');
 const collectionsStorage = require('../storage/collectionsStorage');
 const historyStorage = require('../storage/historyStorage');
 const settingsStorage = require('../storage/settingsStorage');
+const testEvaluator = require('../tests/testEvaluator');
+const openApiParser = require('../openapi/openApiParser');
+const errorExplainer = require('../explainer/errorExplainer');
+const roleMatrixRunner = require('../roles/roleMatrixRunner');
 
 /**
  * Validates any optional arguments supplied to the getAppInfo IPC channel.
@@ -274,11 +278,275 @@ function registerAppHandlers(ipcMain, appInstance) {
   ipcMain.handle('settings:reset', async () => {
     return settingsStorage.resetSettings();
   });
+
+  // =========================================================================
+  // Automated API Testing Channels (Step 6)
+  // =========================================================================
+
+  ipcMain.handle('tests:evaluate', async (event, tests, response) => {
+    if (!Array.isArray(tests)) {
+      throw new TypeError('tests:evaluate tests argument must be an array');
+    }
+    return testEvaluator.evaluateTests(tests, response || {});
+  });
+
+  // =========================================================================
+  // OpenAPI 3.x Import Channels (Step 7)
+  // =========================================================================
+
+  ipcMain.handle('openapi:fetch-url', async (event, url) => {
+    if (!url || typeof url !== 'string' || !url.trim()) {
+      throw new TypeError('OpenAPI URL must be a non-empty string');
+    }
+    const trimmed = url.trim();
+    let parsedUrl;
+    try {
+      parsedUrl = new URL(trimmed);
+    } catch (_) {
+      throw new Error(`Invalid URL format: "${trimmed}". URL must begin with http:// or https://`);
+    }
+
+    if (parsedUrl.protocol !== 'http:' && parsedUrl.protocol !== 'https:') {
+      throw new Error(`Unsupported URL protocol "${parsedUrl.protocol}". Only HTTP and HTTPS URLs are supported.`);
+    }
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 20000);
+
+    try {
+      let res;
+      try {
+        res = await fetch(trimmed, {
+          method: 'GET',
+          headers: {
+            'Accept': 'application/json, text/plain, */*',
+            'User-Agent': 'ApiForge-Lite/0.1.0 (OpenAPI-Discovery-Engine)'
+          },
+          signal: controller.signal
+        });
+      } catch (netErr) {
+        clearTimeout(timeoutId);
+        if (netErr.name === 'AbortError') {
+          throw new Error(`Connection timed out after 20 seconds while reaching: ${trimmed}`);
+        }
+        if (netErr.code === 'ENOTFOUND' || (netErr.message && netErr.message.includes('ENOTFOUND'))) {
+          throw new Error(`Could not resolve remote host: "${parsedUrl.hostname}". Check domain name and internet connectivity.`);
+        }
+        if (netErr.code === 'ECONNREFUSED' || (netErr.message && netErr.message.includes('ECONNREFUSED'))) {
+          throw new Error(`Connection refused by host ${parsedUrl.host}. The server is offline or the port is closed.`);
+        }
+        if (netErr.code === 'ECONNRESET' || (netErr.message && netErr.message.includes('ECONNRESET'))) {
+          throw new Error(`Connection was reset by host ${parsedUrl.host}.`);
+        }
+        throw new Error(`Network error connecting to ${trimmed}: ${netErr.message}`);
+      }
+
+      clearTimeout(timeoutId);
+
+      if (!res.ok) {
+        if (res.status === 401 || res.status === 403) {
+          throw new Error(`Access denied (HTTP ${res.status} ${res.statusText}) at ${trimmed}. OpenAPI documentation is protected by authentication.`);
+        }
+        if (res.status === 404) {
+          throw new Error(`OpenAPI specification not found at ${trimmed} (HTTP 404). Check if the path is correct (e.g. /v3/api-docs).`);
+        }
+        throw new Error(`Remote server returned HTTP ${res.status} ${res.statusText} at ${trimmed}`);
+      }
+
+      const text = await res.text();
+      if (text.length > openApiParser.MAX_DOC_SIZE_BYTES) {
+        throw new Error(`Document size exceeds 10 MB limit (${Math.round(text.length / 1024 / 1024)} MB).`);
+      }
+
+      let jsonDoc;
+      try {
+        jsonDoc = JSON.parse(text);
+      } catch (err) {
+        const preview = text.substring(0, 100).replace(/\s+/g, ' ');
+        throw new Error(`Response from ${trimmed} is not valid JSON (${err.message}). Content starts with: "${preview}"`);
+      }
+
+      // Pass trimmed document URL to parseOpenApi for relative server URL resolution
+      const parsedSpec = openApiParser.parseOpenApi(jsonDoc, trimmed);
+      return {
+        success: true,
+        source: trimmed,
+        documentUrl: trimmed,
+        ...parsedSpec
+      };
+    } catch (err) {
+      throw err;
+    }
+  });
+
+  ipcMain.handle('openapi:open-file', async () => {
+    const dialogResult = await dialog.showOpenDialog({
+      title: 'Select OpenAPI 3.x Specification File',
+      filters: [
+        { name: 'OpenAPI JSON (*.json)', extensions: ['json'] },
+        { name: 'All Files (*.*)', extensions: ['*'] }
+      ],
+      properties: ['openFile']
+    });
+
+    if (dialogResult.canceled || !dialogResult.filePaths || dialogResult.filePaths.length === 0) {
+      return { cancelled: true };
+    }
+
+    const filePath = dialogResult.filePaths[0];
+    const stat = fs.statSync(filePath);
+    if (stat.size > openApiParser.MAX_DOC_SIZE_BYTES) {
+      throw new Error(`File size exceeds 10 MB limit (${Math.round(stat.size / 1024 / 1024)} MB).`);
+    }
+
+    const rawContent = fs.readFileSync(filePath, 'utf8');
+    let jsonDoc;
+    try {
+      jsonDoc = JSON.parse(rawContent);
+    } catch (err) {
+      throw new Error(`Failed to parse local OpenAPI file: File is not valid JSON (${err.message}).`);
+    }
+
+    const parsedSpec = openApiParser.parseOpenApi(jsonDoc);
+    return {
+      success: true,
+      filePath,
+      filename: path.basename(filePath),
+      ...parsedSpec
+    };
+  });
+
+  ipcMain.handle('openapi:parse-content', async (event, content) => {
+    if (!content) {
+      throw new Error('Content is required');
+    }
+    let jsonDoc;
+    if (typeof content === 'string') {
+      try {
+        jsonDoc = JSON.parse(content);
+      } catch (err) {
+        throw new Error(`Failed to parse OpenAPI document: Content is not valid JSON (${err.message}).`);
+      }
+    } else if (typeof content === 'object') {
+      jsonDoc = content;
+    } else {
+      throw new Error('Content must be a JSON string or object');
+    }
+
+    const parsedSpec = openApiParser.parseOpenApi(jsonDoc);
+    return {
+      success: true,
+      ...parsedSpec
+    };
+  });
+
+  // =========================================================================
+  // Spring Boot Error Explainer Channels (Step 8)
+  // =========================================================================
+
+  ipcMain.handle('explainer:explain-error', async (event, context) => {
+    if (!context || typeof context !== 'object') {
+      throw new TypeError('explainer:explain-error context must be an object');
+    }
+    return errorExplainer.explainSpringError(context);
+  });
+
+  ipcMain.handle('openapi:import-endpoints', async (event, payload) => {
+    if (!payload || typeof payload !== 'object') {
+      throw new TypeError('openapi:import-endpoints payload must be an object');
+    }
+
+    const {
+      targetCollectionId,
+      targetCollectionName,
+      targetFolderId,
+      endpoints,
+      options = {}
+    } = payload;
+
+    if (!Array.isArray(endpoints) || endpoints.length === 0) {
+      throw new Error('No endpoints provided for import');
+    }
+
+    let colId = targetCollectionId;
+    if (!colId || colId === 'new') {
+      const colName = (targetCollectionName || 'Imported API').trim();
+      const newCol = collectionsStorage.createCollection(colName);
+      colId = newCol.id;
+    }
+
+    // Get existing collection requests to detect duplicates
+    const collections = collectionsStorage.getCollectionsTree();
+    const targetCol = collections.find(c => c.id === colId);
+    if (!targetCol) {
+      throw new Error(`Target collection not found: ${colId}`);
+    }
+
+    let existingRequests = [];
+    if (targetFolderId) {
+      const folder = (targetCol.folders || []).find(f => f.id === targetFolderId);
+      if (folder) existingRequests = folder.requests || [];
+    } else {
+      existingRequests = targetCol.requests || [];
+    }
+
+    let importedCount = 0;
+    let skippedCount = 0;
+    const duplicates = [];
+
+    const duplicateStrategy = options.duplicateStrategy || 'rename'; // 'skip' | 'rename' | 'keep'
+
+    for (const ep of endpoints) {
+      const converted = openApiParser.convertEndpointToRequest(ep, options);
+
+      // Check for existing request with same name or same method+url
+      const duplicate = existingRequests.find(
+        r => r.name.toLowerCase() === converted.name.toLowerCase() ||
+             (r.method.toUpperCase() === converted.method.toUpperCase() && r.url.toLowerCase() === converted.url.toLowerCase())
+      );
+
+      if (duplicate) {
+        duplicates.push(converted.name);
+        if (duplicateStrategy === 'skip') {
+          skippedCount++;
+          continue;
+        } else if (duplicateStrategy === 'rename') {
+          converted.name = `${converted.name} (Imported)`;
+        }
+      }
+
+      collectionsStorage.saveRequest(colId, targetFolderId || null, converted, null);
+
+      importedCount++;
+    }
+
+    return {
+      success: true,
+      collectionId: colId,
+      totalRequested: endpoints.length,
+      importedCount,
+      skippedCount,
+      duplicates
+    };
+  });
+
+  // =========================================================================
+  // Spring Security Role Testing Matrix Channels (Step 9)
+  // =========================================================================
+
+  ipcMain.handle('roles:run-matrix', async (event, payload) => {
+    if (!payload || typeof payload !== 'object') {
+      throw new TypeError('roles:run-matrix payload must be an object');
+    }
+    return roleMatrixRunner.runRoleMatrix(payload);
+  });
+
 }
 
 module.exports = {
   validateGetAppInfoArgs,
   handleGetAppInfo,
   registerAppHandlers
+
 };
 

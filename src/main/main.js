@@ -1,3 +1,4 @@
+const fs = require('fs');
 ﻿const path = require('path');
 const { app, BrowserWindow, ipcMain, session } = require('electron');
 const { registerAppHandlers } = require('./ipc/appHandlers');
@@ -11,6 +12,7 @@ let mainWindow = null;
 function createMainWindow() {
   const preloadPath = path.resolve(__dirname, '../preload/preload.js');
   const rendererPath = path.resolve(__dirname, '../renderer/index.html');
+  const iconPath = path.resolve(__dirname, '../../assets/icon.png');
 
   mainWindow = new BrowserWindow({
     width: 1280,
