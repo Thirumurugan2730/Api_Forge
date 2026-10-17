@@ -185,7 +185,3 @@ To test ApiForge Lite against a live Spring Boot application:
 4. Click any discovered endpoint to load its path, HTTP method, and headers into the active request editor.
 
 ---
-
-## 📄 License
-
-This project is licensed under the [MIT License](LICENSE).
